@@ -49,7 +49,7 @@ export function SupplierStep() {
   };
 
   return (
-    <div className="space-y-5 p-4">
+    <div className="space-y-5">
       <div>
         <h2 className="text-lg font-bold text-kuaizi-ink">Escanear proveedor</h2>
         <p className="text-sm text-gray-400 mt-0.5">

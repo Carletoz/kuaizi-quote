@@ -167,7 +167,7 @@ export function ProductStep() {
     form.dimensionsSource === 'direct' ? 'CBM directo (del tag)' : 'CBM calculado (dimensiones)';
 
   return (
-    <div className="space-y-5 p-4">
+    <div className="space-y-5">
       {/* Active supplier badge */}
       {activeSupplier && (
         <div className="rounded-xl bg-kuaizi-secondary/10 border border-kuaizi-secondary/20 px-4 py-2">
