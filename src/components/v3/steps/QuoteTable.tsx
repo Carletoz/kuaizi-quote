@@ -127,7 +127,7 @@ type DraftValues = ReturnType<typeof deriveDraftValues>;
 // Text-style actions that live inside table cells. `-my-1.5` cancels the cell
 // padding so the 44px touch target does not inflate the row.
 const ROW_LINK_CLASS =
-  'focus-ring -my-1.5 inline-flex min-h-[44px] items-center rounded px-2 text-xs font-semibold text-accent underline underline-offset-4 hover:text-heading';
+  'focus-ring -my-1.5 inline-flex min-h-[44px] items-center rounded px-2 text-xs font-semibold text-secondary underline underline-offset-4 hover:text-secondary-hover';
 
 interface RowDetailProps {
   product: ProductEntry;
