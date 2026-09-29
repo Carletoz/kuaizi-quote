@@ -1,7 +1,18 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, Fragment } from 'react';
 import { calculateLandedCost } from '@/lib/calc/v3-landed';
+import type { LandedCostResult } from '@/lib/calc/v3-landed';
 import { ALL_HS_CATEGORIES, getHSCategory } from '@/data/hs-categories';
 import type { ProductEntry, SupplierEntry } from '@/state/session/types';
+import { Alert } from '@/components/ui/Alert';
+import { Button, buttonClasses } from '@/components/ui/Button';
+import { SelectField } from '@/components/ui/SelectField';
+import { Spinner } from '@/components/ui/Spinner';
+import { TextField } from '@/components/ui/TextField';
+import { ArrowTopRightOnSquareIcon, XMarkIcon } from '@/components/ui/icons';
+import { inputClasses } from '@/components/ui/fieldStyles';
+import { Breakdown, GroupTh, Td, Th } from '../quote/cells';
+import { ProductPhoto } from '../quote/ProductPhoto';
+import { RatesCard } from '../quote/RatesCard';
 
 const CUSTOM_HS = '__custom__';
 
@@ -38,74 +49,6 @@ interface QuoteTableProps {
 
 function fmtCOP(n: number): string {
   return Math.round(n).toLocaleString('es-CO');
-}
-
-function fmtDate(iso: string | null): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' });
-}
-
-function ImagePreview({ file }: { file: File }) {
-  const [url, setUrl] = useState<string>('');
-  const [expanded, setExpanded] = useState(false);
-
-  useEffect(() => {
-    const objectUrl = URL.createObjectURL(file);
-    setUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [file]);
-
-  if (!url) return null;
-
-  return (
-    <>
-      <img
-        src={url}
-        alt="Foto producto"
-        onClick={() => setExpanded(true)}
-        className="w-20 h-20 object-cover rounded-lg border border-gray-200 mb-2 cursor-zoom-in"
-      />
-      {expanded && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
-          onClick={() => setExpanded(false)}
-        >
-          <img
-            src={url}
-            alt="Foto producto"
-            className="max-w-[90vw] max-h-[90vh] rounded-xl shadow-2xl object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button
-            type="button"
-            onClick={() => setExpanded(false)}
-            className="absolute top-4 right-4 text-white text-2xl leading-none bg-black/40 rounded-full w-9 h-9 flex items-center justify-center hover:bg-black/60"
-          >
-            ×
-          </button>
-        </div>
-      )}
-    </>
-  );
-}
-
-function DesglosRow({
-  label,
-  value,
-  unit,
-  bold,
-}: {
-  label: string;
-  value: number;
-  unit: string;
-  bold?: boolean;
-}) {
-  return (
-    <div className={`flex justify-between text-xs py-0.5 ${bold ? 'font-bold border-t border-gray-200 pt-1 mt-0.5' : 'text-gray-500'}`}>
-      <span>{label}</span>
-      <span className={bold ? 'text-kuaizi-ink' : ''}>{value.toLocaleString('es-CO', { maximumFractionDigits: 2 })} {unit}</span>
-    </div>
-  );
 }
 
 function seedDraft(p: ProductEntry): EditDraft {
@@ -164,6 +107,230 @@ function draftToFields(d: EditDraft): Partial<ProductEntry> | null {
   }
 
   return fields;
+}
+
+/**
+ * Numeric values read from the edit draft, falling back to the saved product.
+ * Shared by the row calculation and the detail panel so both agree.
+ */
+function deriveDraftValues(p: ProductEntry, draft: EditDraft | null) {
+  return {
+    numCajas: draft ? (parseInt(draft.numCajas, 10) || 0) : 0,
+    piezasPorCaja: draft ? (parseFloat(draft.piezasPorCaja) || p.piezasPorCaja) : p.piezasPorCaja,
+    cbm: draft ? (parseFloat(draft.cbm) || p.cbm) : p.cbm,
+    fleteInterno: draft ? (parseFloat(draft.fleteInternoChinaRmb) || 0) : (p.fleteInternoChinaRmb ?? 0),
+  };
+}
+
+type DraftValues = ReturnType<typeof deriveDraftValues>;
+
+// Text-style actions that live inside table cells. `-my-1.5` cancels the cell
+// padding so the 44px touch target does not inflate the row.
+const ROW_LINK_CLASS =
+  'focus-ring -my-1.5 inline-flex min-h-[44px] items-center rounded px-2 text-xs font-semibold text-accent underline underline-offset-4 hover:text-heading';
+
+interface RowDetailProps {
+  product: ProductEntry;
+  file: File | undefined;
+  calc: LandedCostResult;
+  /** Non-null only while this row is being edited. */
+  draft: EditDraft | null;
+  draftValues: DraftValues;
+  onDraftChange: (patch: Partial<EditDraft>) => void;
+  saveError: string | null;
+  onStartEdit: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+  sellingPrice: string;
+  onSellingPriceChange: (value: string) => void;
+  rentabilidad: number | null;
+}
+
+/** Expanded row: cost breakdown + profitability, or the edit form with a live preview. */
+function RowDetail({
+  product,
+  file,
+  calc,
+  draft,
+  draftValues,
+  onDraftChange,
+  saveError,
+  onStartEdit,
+  onSave,
+  onCancel,
+  sellingPrice,
+  onSellingPriceChange,
+  rentabilidad,
+}: RowDetailProps) {
+  const handleHsChange = (v: string) => {
+    if (v === CUSTOM_HS) {
+      onDraftChange({ hsCategoryId: CUSTOM_HS });
+      return;
+    }
+    const cat = ALL_HS_CATEGORIES.find((c) => c.id === v);
+    if (cat) {
+      onDraftChange({
+        hsCategoryId: v,
+        arancelRate: String(Math.round(cat.arancelRate * 100)),
+        ivaRate: String(Math.round(cat.ivaRate * 100)),
+      });
+    }
+  };
+
+  const hsOptions = [
+    ...ALL_HS_CATEGORIES.map((cat) => ({ value: cat.id, label: cat.label })),
+    { value: CUSTOM_HS, label: 'Personalizado' },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {/* Left: image + edit form or desglose */}
+      <div className="space-y-3 rounded-xl border border-border bg-surface p-4">
+        {file && <ProductPhoto file={file} />}
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold text-heading">{draft ? 'Editar producto' : 'Desglose DDP'}</h3>
+          {!draft && (
+            <Button variant="link" size="sm" onClick={onStartEdit}>
+              Editar
+            </Button>
+          )}
+        </div>
+
+        {draft ? (
+          <div className="space-y-4">
+            <TextField
+              label="Nombre del producto"
+              value={draft.name}
+              onChange={(e) => onDraftChange({ name: e.target.value })}
+            />
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <TextField
+                label="# Cajas"
+                type="number"
+                min={1}
+                step={1}
+                value={draft.numCajas}
+                onChange={(e) => onDraftChange({ numCajas: e.target.value })}
+                hint={
+                  draftValues.numCajas > 0 && draftValues.piezasPorCaja > 0
+                    ? `= ${draftValues.numCajas * draftValues.piezasPorCaja} piezas · ${(draftValues.cbm * draftValues.numCajas).toFixed(3)} m³ CBM total`
+                    : undefined
+                }
+              />
+              <TextField
+                label="Precio unitario (¥ RMB)"
+                type="number"
+                value={draft.unitPriceRmb}
+                onChange={(e) => onDraftChange({ unitPriceRmb: e.target.value })}
+              />
+              <TextField
+                label="Piezas / caja"
+                type="number"
+                value={draft.piezasPorCaja}
+                onChange={(e) => onDraftChange({ piezasPorCaja: e.target.value })}
+              />
+              <TextField
+                label="CBM / caja"
+                type="number"
+                step="0.001"
+                value={draft.cbm}
+                onChange={(e) => onDraftChange({ cbm: e.target.value })}
+              />
+              <TextField
+                label="Flete Interno China (¥ RMB)"
+                type="number"
+                step="0.01"
+                min={0}
+                value={draft.fleteInternoChinaRmb}
+                onChange={(e) => onDraftChange({ fleteInternoChinaRmb: e.target.value })}
+                wrapperClassName="sm:col-span-2"
+              />
+            </div>
+
+            <SelectField
+              label="Categoria arancelaria"
+              value={draft.hsCategoryId}
+              options={hsOptions}
+              onChange={handleHsChange}
+            />
+
+            {draft.hsCategoryId === CUSTOM_HS && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <TextField
+                  label="Arancel (%)"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={draft.arancelRate}
+                  onChange={(e) => onDraftChange({ arancelRate: e.target.value })}
+                />
+                <TextField
+                  label="IVA (%)"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={draft.ivaRate}
+                  onChange={(e) => onDraftChange({ ivaRate: e.target.value })}
+                />
+              </div>
+            )}
+
+            {saveError && <Alert kind="danger">{saveError}</Alert>}
+
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={onSave} disabled={draftToFields(draft) === null}>
+                Guardar
+              </Button>
+              <Button variant="outline" onClick={onCancel}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Breakdown calc={calc} fleteInternoChinaRmb={product.fleteInternoChinaRmb ?? 0} />
+        )}
+      </div>
+
+      {/* Right: rentabilidad / live preview when editing */}
+      <div className="space-y-3 rounded-xl border border-border bg-surface p-4">
+        {draft ? (
+          <>
+            <h3 className="text-sm font-semibold text-heading">Vista previa</h3>
+            <Breakdown calc={calc} fleteInternoChinaRmb={draftValues.fleteInterno} />
+          </>
+        ) : (
+          <>
+            <h3 className="text-sm font-semibold text-heading">Rentabilidad</h3>
+            <p className="text-sm text-content-muted">
+              Costo unidad: COP${fmtCOP(calc.precioUnidadFinalCop)}
+            </p>
+            <TextField
+              label="Precio de venta (COP / u)"
+              inputMode="decimal"
+              value={sellingPrice}
+              onChange={(e) => onSellingPriceChange(e.target.value)}
+              placeholder="Ej: 25000"
+            />
+            {rentabilidad !== null && (
+              <div
+                className={`flex items-center justify-between rounded-lg border px-3 py-2 ${
+                  rentabilidad >= 0
+                    ? 'border-success/40 bg-success-surface text-success-content'
+                    : 'border-danger/40 bg-danger-surface text-danger-content'
+                }`}
+              >
+                <span className="text-sm font-semibold">Rentabilidad</span>
+                <span className="text-base font-bold tabular-nums">
+                  {rentabilidad >= 0 ? '+' : ''}{rentabilidad.toFixed(2)}%
+                </span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function QuoteTable({
@@ -279,67 +446,59 @@ export function QuoteTable({
   };
 
   return (
-    <div className="space-y-4">
-      {/* Rates header */}
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 space-y-1">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="space-y-0.5">
-            <p className="text-xs font-semibold text-kuaizi-secondary uppercase tracking-wide">Tasas de cambio</p>
-            <p className="text-sm text-kuaizi-ink">
-              TRM: {trmCopUsd.toLocaleString('es-CO')} COP/USD &nbsp;·&nbsp; CNY: {(1 / cnyToUsd).toFixed(4)}/USD
-            </p>
-            <p className="text-xs text-gray-400">Actualizado: {fmtDate(ratesFetchedAt)}</p>
-          </div>
-          {ratesUsedFallback && (
-            <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-1 rounded-full border border-amber-200">
-              Tasa por defecto
-            </span>
-          )}
-        </div>
-      </div>
+    <div className="flex flex-col gap-4">
+      <RatesCard
+        trmCopUsd={trmCopUsd}
+        cnyToUsd={cnyToUsd}
+        ratesFetchedAt={ratesFetchedAt}
+        ratesUsedFallback={ratesUsedFallback}
+      />
 
       {/* Table */}
       {products.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-          <table className="w-full text-xs min-w-[1400px]">
+        <div
+          role="region"
+          aria-label="Cotización por producto"
+          tabIndex={0}
+          className="focus-ring overflow-x-auto rounded-xl border border-border bg-surface shadow-card"
+        >
+          <table className="w-full min-w-[1400px] text-xs">
             <thead>
               {/* Group header row */}
-              <tr className="bg-gray-100 border-b border-gray-200">
-                <th colSpan={4} className="text-center px-3 py-1.5 font-bold text-gray-600 border-r border-gray-200">
+              <tr className="border-b border-border bg-surface-sunken">
+                <GroupTh colSpan={4} groupEnd>
                   Especificaciones
-                </th>
-                <th colSpan={3} className="text-center px-3 py-1.5 font-bold text-gray-600 border-r border-gray-200">
+                </GroupTh>
+                <GroupTh colSpan={3} groupEnd>
                   Logistica
-                </th>
-                <th colSpan={9} className="text-center px-3 py-1.5 font-bold text-gray-600 border-r border-gray-200">
+                </GroupTh>
+                <GroupTh colSpan={9} groupEnd>
                   Precio
-                </th>
-                <th colSpan={2} className="text-center px-3 py-1.5 font-bold text-gray-600">
-                  Rentabilidad
-                </th>
+                </GroupTh>
+                <GroupTh colSpan={2}>Rentabilidad</GroupTh>
                 <th className="px-3 py-1.5" />
               </tr>
               {/* Column header row */}
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-center px-3 py-2 font-semibold text-gray-500">#</th>
-                <th className="text-left px-3 py-2 font-semibold text-gray-500">Nombre</th>
-                <th className="text-center px-3 py-2 font-semibold text-gray-500">Foto</th>
-                <th className="text-left px-3 py-2 font-semibold text-gray-500 border-r border-gray-200">HSCODE</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-500">Piezas/caja</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-500"># Cajas</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-500 border-r border-gray-200">CBM</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-500">Precio Fabrica (¥)</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-500">% Comision</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-500">Flete Int. China (¥)</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-500">Precio/u c/margen (¥)</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-500">Cantidad</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-500">Total Orden (¥)</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-500">FLETE+IMP (COP)</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-500">PRECIO UNIT (COP)</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-500 border-r border-gray-200">PRECIO TOTAL (COP)</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-500">Precio Actual Colombia (COP)</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-500">Rentabilidad %</th>
-                <th className="px-3 py-2" />
+              <tr className="border-b border-border bg-surface-raised">
+                <Th align="center">#</Th>
+                <Th align="left">Nombre</Th>
+                <Th align="center">Foto</Th>
+                <Th align="left" groupEnd>HSCODE</Th>
+                <Th>Piezas/caja</Th>
+                <Th># Cajas</Th>
+                <Th groupEnd>CBM</Th>
+                <Th>Precio Fabrica (¥)</Th>
+                <Th>% Comision</Th>
+                <Th>Flete Int. China (¥)</Th>
+                <Th>Precio/u c/margen (¥)</Th>
+                <Th>Cantidad</Th>
+                <Th>Total Orden (¥)</Th>
+                <Th>FLETE+IMP (COP)</Th>
+                <Th>PRECIO UNIT (COP)</Th>
+                <Th groupEnd>PRECIO TOTAL (COP)</Th>
+                <Th>Precio Actual Colombia (COP)</Th>
+                <Th>Rentabilidad %</Th>
+                <Th ariaLabel="Acciones" />
               </tr>
             </thead>
             <tbody>
@@ -347,22 +506,19 @@ export function QuoteTable({
                 const isExpanded = expandedId === p.id;
                 const isEditing = editingId === p.id && draft !== null;
 
-                const draftNumCajas = draft ? (parseInt(draft.numCajas, 10) || 0) : 0;
-                const draftPiezasPorCaja = draft ? (parseFloat(draft.piezasPorCaja) || p.piezasPorCaja) : p.piezasPorCaja;
-                const draftCbm = draft ? (parseFloat(draft.cbm) || p.cbm) : p.cbm;
-                const draftFleteInterno = draft ? (parseFloat(draft.fleteInternoChinaRmb) || 0) : (p.fleteInternoChinaRmb ?? 0);
+                const dv = deriveDraftValues(p, draft);
 
                 const draftProduct: ProductEntry = isEditing
                   ? {
                       ...p,
                       name: draft.name || p.name,
-                      quantity: draftNumCajas * draftPiezasPorCaja || p.quantity,
+                      quantity: dv.numCajas * dv.piezasPorCaja || p.quantity,
                       unitPriceRmb: parseFloat(draft.unitPriceRmb) || p.unitPriceRmb,
-                      piezasPorCaja: draftPiezasPorCaja,
-                      cbm: draftCbm,
+                      piezasPorCaja: dv.piezasPorCaja,
+                      cbm: dv.cbm,
                       arancelRate: Math.min(100, Math.max(0, parseFloat(draft.arancelRate) || 0)) / 100,
                       ivaRate: Math.min(100, Math.max(0, parseFloat(draft.ivaRate) || 0)) / 100,
-                      fleteInternoChinaRmb: draftFleteInterno,
+                      fleteInternoChinaRmb: dv.fleteInterno,
                     }
                   : p;
 
@@ -391,327 +547,110 @@ export function QuoteTable({
                     ? ((sellingPriceCop - calc.precioUnidadFinalCop) / calc.precioUnidadFinalCop) * 100
                     : null;
 
+                const file = entityFiles?.get(p.id);
+                const setSellingPrice = (value: string) =>
+                  setSellingPrices((prev) => ({ ...prev, [p.id]: value }));
+
                 return (
                   <Fragment key={p.id}>
-                    <tr className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-3 py-2 text-center text-gray-500">{idx + 1}</td>
-                      <td className="px-3 py-2 text-kuaizi-ink font-medium">{p.name}</td>
-                      <td className="px-3 py-2 text-center">
-                        {entityFiles?.get(p.id) ? (
+                    <tr className="border-b border-border hover:bg-surface-raised">
+                      <Td align="center" className="text-content-subtle">{idx + 1}</Td>
+                      <Td align="left" className="min-w-[10rem] font-medium text-content">{p.name}</Td>
+                      <Td align="center">
+                        {file ? (
                           <button
                             type="button"
                             onClick={() => setExpandedId(isExpanded ? null : p.id)}
-                            className="text-xs text-kuaizi-secondary underline"
+                            aria-label={`Ver foto de ${p.name}`}
+                            aria-expanded={isExpanded}
+                            className={ROW_LINK_CLASS}
                           >
                             ver
                           </button>
                         ) : (
-                          <span className="text-gray-300">—</span>
+                          <span className="text-content-subtle">—</span>
                         )}
-                      </td>
-                      <td className="px-3 py-2 text-gray-500 border-r border-gray-100">{hsCode}</td>
-                      <td className="px-3 py-2 text-right text-kuaizi-ink">{p.piezasPorCaja}</td>
-                      <td className="px-3 py-2 text-right text-kuaizi-ink">{numCajas}</td>
-                      <td className="px-3 py-2 text-right text-kuaizi-ink border-r border-gray-100">{totalCbm.toFixed(3)}</td>
-                      <td className="px-3 py-2 text-right text-kuaizi-ink">¥{p.unitPriceRmb.toFixed(2)}</td>
-                      <td className="px-3 py-2 text-right text-gray-500">5.00%</td>
-                      <td className="px-3 py-2 text-right text-kuaizi-ink">¥{(p.fleteInternoChinaRmb ?? 0).toFixed(2)}</td>
-                      <td className="px-3 py-2 text-right text-kuaizi-ink">¥{calc.precioConMargenRmb.toFixed(2)}</td>
-                      <td className="px-3 py-2 text-right text-kuaizi-ink">{p.quantity}</td>
-                      <td className="px-3 py-2 text-right text-kuaizi-ink">¥{calc.totalChinaRmb.toFixed(0)}</td>
-                      <td className="px-3 py-2 text-right text-kuaizi-ink">COP${fmtCOP(calc.fleteImpuestosCop)}</td>
-                      <td className="px-3 py-2 text-right font-semibold text-kuaizi-ink">COP${fmtCOP(calc.precioUnidadFinalCop)}</td>
-                      <td className="px-3 py-2 text-right font-bold text-kuaizi-secondary border-r border-gray-100">COP${fmtCOP(calc.precioTotalFinalCop)}</td>
-                      <td className="px-3 py-2 text-right">
+                      </Td>
+                      <Td align="left" groupEnd className="text-content-muted">{hsCode}</Td>
+                      <Td className="tabular-nums text-content">{p.piezasPorCaja}</Td>
+                      <Td className="tabular-nums text-content">{numCajas}</Td>
+                      <Td groupEnd className="tabular-nums text-content">{totalCbm.toFixed(3)}</Td>
+                      <Td className="tabular-nums text-content">¥{p.unitPriceRmb.toFixed(2)}</Td>
+                      <Td className="tabular-nums text-content-muted">5.00%</Td>
+                      <Td className="tabular-nums text-content">¥{(p.fleteInternoChinaRmb ?? 0).toFixed(2)}</Td>
+                      <Td className="tabular-nums text-content">¥{calc.precioConMargenRmb.toFixed(2)}</Td>
+                      <Td className="tabular-nums text-content">{p.quantity}</Td>
+                      <Td className="tabular-nums text-content">¥{calc.totalChinaRmb.toFixed(0)}</Td>
+                      <Td className="tabular-nums text-content">COP${fmtCOP(calc.fleteImpuestosCop)}</Td>
+                      <Td className="font-semibold tabular-nums text-content">COP${fmtCOP(calc.precioUnidadFinalCop)}</Td>
+                      <Td groupEnd className="font-bold tabular-nums text-heading">COP${fmtCOP(calc.precioTotalFinalCop)}</Td>
+                      <Td>
                         <input
                           type="text"
                           inputMode="decimal"
                           value={rawSellingPrice}
-                          onChange={(e) =>
-                            setSellingPrices((prev) => ({ ...prev, [p.id]: e.target.value }))
-                          }
+                          onChange={(e) => setSellingPrice(e.target.value)}
                           placeholder="Ej: 25000"
-                          className="rounded-md border border-gray-300 bg-white text-xs px-2 py-1 focus:outline-none focus:border-kuaizi-accent focus:ring-1 focus:ring-kuaizi-accent w-28 text-right"
+                          aria-label={`Precio actual en Colombia (COP) de ${p.name}`}
+                          className={inputClasses({ compact: true, widthClass: 'w-32', className: 'text-right' })}
                         />
-                      </td>
-                      <td className="px-3 py-2 text-right">
+                      </Td>
+                      <Td>
                         {rentabilidad !== null ? (
-                          <span className={`font-semibold ${rentabilidad >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          <span
+                            className={`font-semibold tabular-nums ${
+                              rentabilidad >= 0 ? 'text-success-content' : 'text-danger-content'
+                            }`}
+                          >
                             {rentabilidad >= 0 ? '+' : ''}{rentabilidad.toFixed(2)}%
                           </span>
                         ) : (
-                          <span className="text-gray-300">—</span>
+                          <span className="text-content-subtle">—</span>
                         )}
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        <div className="flex items-center gap-2">
+                      </Td>
+                      <Td align="center">
+                        <div className="flex items-center gap-1">
                           <button
                             type="button"
                             onClick={() => setExpandedId(isExpanded ? null : p.id)}
-                            className="text-xs text-kuaizi-secondary underline hover:opacity-70"
+                            aria-label={`${isExpanded ? 'Cerrar' : 'Editar'} ${p.name}`}
+                            aria-expanded={isExpanded}
+                            className={ROW_LINK_CLASS}
                           >
                             {isExpanded ? 'cerrar' : 'editar'}
                           </button>
                           <button
                             type="button"
                             onClick={() => onRemove(p.id)}
-                            className="text-red-400 hover:text-red-600 transition-colors"
-                            aria-label="Remove product"
+                            aria-label={`Eliminar ${p.name}`}
+                            className="focus-ring -my-1.5 inline-flex h-11 w-11 items-center justify-center rounded-lg text-content-subtle transition-colors hover:bg-danger-surface hover:text-danger-content"
                           >
-                            ×
+                            <XMarkIcon className="h-4 w-4" />
                           </button>
                         </div>
-                      </td>
+                      </Td>
                     </tr>
 
                     {isExpanded && (
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <td colSpan={19} className="px-4 py-3">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Left: image + edit form or desglose */}
-                            <div className="space-y-0.5">
-                              {entityFiles?.get(p.id) && (
-                                <ImagePreview file={entityFiles.get(p.id)!} />
-                              )}
-                              <div className="flex items-center justify-between mb-2">
-                                <p className="text-xs font-bold text-kuaizi-secondary uppercase tracking-wide">
-                                  {isEditing ? 'Editar producto' : 'Desglose DDP'}
-                                </p>
-                                {!isEditing && (
-                                  <button
-                                    type="button"
-                                    onClick={() => startEdit(p)}
-                                    className="text-xs text-kuaizi-secondary underline"
-                                  >
-                                    Editar
-                                  </button>
-                                )}
-                              </div>
-
-                              {isEditing ? (
-                                <div className="space-y-3">
-                                  <div className="space-y-1">
-                                    <label className="text-xs font-medium text-kuaizi-ink">Nombre del producto</label>
-                                    <input
-                                      type="text"
-                                      value={draft.name}
-                                      onChange={(e) => setDraft((d) => d ? { ...d, name: e.target.value } : d)}
-                                      className="rounded-md border border-gray-300 bg-white text-sm px-3 py-1.5 focus:outline-none focus:border-kuaizi-accent focus:ring-1 focus:ring-kuaizi-accent w-full"
-                                    />
-                                  </div>
-
-                                  <div className="space-y-1">
-                                    <label className="text-xs font-medium text-kuaizi-ink"># Cajas</label>
-                                    <input
-                                      type="number"
-                                      min={1}
-                                      step={1}
-                                      value={draft.numCajas}
-                                      onChange={(e) => setDraft((d) => d ? { ...d, numCajas: e.target.value } : d)}
-                                      className="rounded-md border border-gray-300 bg-white text-sm px-3 py-1.5 focus:outline-none focus:border-kuaizi-accent focus:ring-1 focus:ring-kuaizi-accent w-full"
-                                    />
-                                    {draftNumCajas > 0 && draftPiezasPorCaja > 0 && (
-                                      <p className="text-xs text-gray-400">
-                                        = {draftNumCajas * draftPiezasPorCaja} piezas · {(draftCbm * draftNumCajas).toFixed(3)} m³ CBM total
-                                      </p>
-                                    )}
-                                  </div>
-
-                                  <div className="space-y-1">
-                                    <label className="text-xs font-medium text-kuaizi-ink">Precio unitario (¥ RMB)</label>
-                                    <input
-                                      type="number"
-                                      value={draft.unitPriceRmb}
-                                      onChange={(e) => setDraft((d) => d ? { ...d, unitPriceRmb: e.target.value } : d)}
-                                      className="rounded-md border border-gray-300 bg-white text-sm px-3 py-1.5 focus:outline-none focus:border-kuaizi-accent focus:ring-1 focus:ring-kuaizi-accent w-full"
-                                    />
-                                  </div>
-
-                                  <div className="space-y-1">
-                                    <label className="text-xs font-medium text-kuaizi-ink">Piezas / caja</label>
-                                    <input
-                                      type="number"
-                                      value={draft.piezasPorCaja}
-                                      onChange={(e) => setDraft((d) => d ? { ...d, piezasPorCaja: e.target.value } : d)}
-                                      className="rounded-md border border-gray-300 bg-white text-sm px-3 py-1.5 focus:outline-none focus:border-kuaizi-accent focus:ring-1 focus:ring-kuaizi-accent w-full"
-                                    />
-                                  </div>
-
-                                  <div className="space-y-1">
-                                    <label className="text-xs font-medium text-kuaizi-ink">CBM / caja</label>
-                                    <input
-                                      type="number"
-                                      step="0.001"
-                                      value={draft.cbm}
-                                      onChange={(e) => setDraft((d) => d ? { ...d, cbm: e.target.value } : d)}
-                                      className="rounded-md border border-gray-300 bg-white text-sm px-3 py-1.5 focus:outline-none focus:border-kuaizi-accent focus:ring-1 focus:ring-kuaizi-accent w-full"
-                                    />
-                                  </div>
-
-                                  <div className="space-y-1">
-                                    <label className="text-xs font-medium text-kuaizi-ink">Flete Interno China (¥ RMB)</label>
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      min={0}
-                                      value={draft.fleteInternoChinaRmb}
-                                      onChange={(e) => setDraft((d) => d ? { ...d, fleteInternoChinaRmb: e.target.value } : d)}
-                                      className="rounded-md border border-gray-300 bg-white text-sm px-3 py-1.5 focus:outline-none focus:border-kuaizi-accent focus:ring-1 focus:ring-kuaizi-accent w-full"
-                                    />
-                                  </div>
-
-                                  <div className="space-y-1">
-                                    <label className="text-xs font-medium text-kuaizi-ink">Categoria arancelaria</label>
-                                    <select
-                                      value={draft.hsCategoryId}
-                                      onChange={(e) => {
-                                        const v = e.target.value;
-                                        if (v === CUSTOM_HS) {
-                                          setDraft((d) => d ? { ...d, hsCategoryId: CUSTOM_HS } : d);
-                                        } else {
-                                          const cat = ALL_HS_CATEGORIES.find((c) => c.id === v);
-                                          if (cat) {
-                                            setDraft((d) =>
-                                              d
-                                                ? {
-                                                    ...d,
-                                                    hsCategoryId: v,
-                                                    arancelRate: String(Math.round(cat.arancelRate * 100)),
-                                                    ivaRate: String(Math.round(cat.ivaRate * 100)),
-                                                  }
-                                                : d
-                                            );
-                                          }
-                                        }
-                                      }}
-                                      className="rounded-md border border-gray-300 bg-white text-sm px-3 py-1.5 focus:outline-none focus:border-kuaizi-accent focus:ring-1 focus:ring-kuaizi-accent w-full"
-                                    >
-                                      {ALL_HS_CATEGORIES.map((cat) => (
-                                        <option key={cat.id} value={cat.id}>
-                                          {cat.label}
-                                        </option>
-                                      ))}
-                                      <option value={CUSTOM_HS}>Personalizado</option>
-                                    </select>
-                                  </div>
-
-                                  {draft.hsCategoryId === CUSTOM_HS && (
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <div className="space-y-1">
-                                        <label className="text-xs font-medium text-kuaizi-ink">Arancel (%)</label>
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          max={100}
-                                          value={draft.arancelRate}
-                                          onChange={(e) => setDraft((d) => d ? { ...d, arancelRate: e.target.value } : d)}
-                                          className="rounded-md border border-gray-300 bg-white text-sm px-3 py-1.5 focus:outline-none focus:border-kuaizi-accent focus:ring-1 focus:ring-kuaizi-accent w-full"
-                                        />
-                                      </div>
-                                      <div className="space-y-1">
-                                        <label className="text-xs font-medium text-kuaizi-ink">IVA (%)</label>
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          max={100}
-                                          value={draft.ivaRate}
-                                          onChange={(e) => setDraft((d) => d ? { ...d, ivaRate: e.target.value } : d)}
-                                          className="rounded-md border border-gray-300 bg-white text-sm px-3 py-1.5 focus:outline-none focus:border-kuaizi-accent focus:ring-1 focus:ring-kuaizi-accent w-full"
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {saveError && (
-                                    <p className="text-xs text-red-600">{saveError}</p>
-                                  )}
-
-                                  <div className="flex gap-2 pt-1">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSave(p.id)}
-                                      disabled={draftToFields(draft) === null}
-                                      className="rounded-lg bg-kuaizi-secondary text-white px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
-                                    >
-                                      Guardar
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={handleCancel}
-                                      className="rounded-lg border border-gray-300 text-gray-600 px-3 py-1.5 text-xs font-semibold"
-                                    >
-                                      Cancelar
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <>
-                                  <DesglosRow label="Precio con margen (5%)" value={calc.precioConMargenRmb} unit="¥" />
-                                  <DesglosRow label="Flete interno China" value={p.fleteInternoChinaRmb ?? 0} unit="¥" />
-                                  <DesglosRow label="Total China" value={calc.totalChinaRmb} unit="¥" bold />
-                                  <DesglosRow label="Flete + Impuestos" value={calc.fleteImpuestosCop} unit="COP" />
-                                  <DesglosRow label="Precio total final" value={calc.precioTotalFinalCop} unit="COP" bold />
-                                  <DesglosRow label="Precio unidad final" value={calc.precioUnidadFinalCop} unit="COP" bold />
-                                </>
-                              )}
-                            </div>
-
-                            {/* Right: rentabilidad / live preview when editing */}
-                            <div className="space-y-2">
-                              {isEditing ? (
-                                <>
-                                  <p className="text-xs font-bold text-kuaizi-secondary uppercase tracking-wide mb-2">
-                                    Vista previa
-                                  </p>
-                                  <DesglosRow label="Precio con margen (5%)" value={calc.precioConMargenRmb} unit="¥" />
-                                  <DesglosRow label="Flete interno China" value={draftFleteInterno} unit="¥" />
-                                  <DesglosRow label="Total China" value={calc.totalChinaRmb} unit="¥" bold />
-                                  <DesglosRow label="Flete + Impuestos" value={calc.fleteImpuestosCop} unit="COP" />
-                                  <DesglosRow label="Precio total final" value={calc.precioTotalFinalCop} unit="COP" bold />
-                                  <DesglosRow label="Precio unidad final" value={calc.precioUnidadFinalCop} unit="COP" bold />
-                                </>
-                              ) : (
-                                <>
-                                  <p className="text-xs font-bold text-kuaizi-secondary uppercase tracking-wide mb-2">
-                                    Rentabilidad
-                                  </p>
-                                  <p className="text-xs text-gray-500">
-                                    Costo unidad: COP${fmtCOP(calc.precioUnidadFinalCop)}
-                                  </p>
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-xs font-medium text-kuaizi-ink">
-                                      Precio de venta (COP / u)
-                                    </label>
-                                    <input
-                                      type="text"
-                                      inputMode="decimal"
-                                      value={rawSellingPrice}
-                                      onChange={(e) =>
-                                        setSellingPrices((prev) => ({ ...prev, [p.id]: e.target.value }))
-                                      }
-                                      placeholder="Ej: 25000"
-                                      className="rounded-md border border-gray-300 bg-white text-sm px-3 py-1.5 focus:outline-none focus:border-kuaizi-accent focus:ring-1 focus:ring-kuaizi-accent w-full"
-                                    />
-                                  </div>
-                                  {rentabilidad !== null && (
-                                    <div
-                                      className={`rounded-lg px-3 py-2 flex justify-between items-center ${
-                                        rentabilidad >= 0
-                                          ? 'bg-emerald-50 border border-emerald-200'
-                                          : 'bg-red-50 border border-red-200'
-                                      }`}
-                                    >
-                                      <span className={`text-xs font-semibold ${rentabilidad >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                                        Rentabilidad
-                                      </span>
-                                      <span className={`text-sm font-bold ${rentabilidad >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                                        {rentabilidad >= 0 ? '+' : ''}{rentabilidad.toFixed(2)}%
-                                      </span>
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                            </div>
+                      <tr className="border-b border-border bg-surface-raised">
+                        <td colSpan={19} className="px-4 py-4">
+                          {/* Pinned to the left edge of the scrolling table so the panel stays in view on phones */}
+                          <div className="sticky left-4 w-[calc(100vw-4.5rem)] max-w-4xl">
+                            <RowDetail
+                              product={p}
+                              file={file}
+                              calc={calc}
+                              draft={isEditing ? draft : null}
+                              draftValues={dv}
+                              onDraftChange={(patch) => setDraft((d) => (d ? { ...d, ...patch } : d))}
+                              saveError={saveError}
+                              onStartEdit={() => startEdit(p)}
+                              onSave={() => handleSave(p.id)}
+                              onCancel={handleCancel}
+                              sellingPrice={rawSellingPrice}
+                              onSellingPriceChange={setSellingPrice}
+                              rentabilidad={rentabilidad}
+                            />
                           </div>
                         </td>
                       </tr>
@@ -721,25 +660,25 @@ export function QuoteTable({
               })}
 
               {/* Grand total row */}
-              <tr className="bg-gray-50 border-t-2 border-gray-300">
-                <td colSpan={5} />
-                <td className="px-3 py-2 text-right font-semibold text-gray-500 text-xs">
+              <tr className="border-t-2 border-border-strong bg-surface-raised">
+                <Td colSpan={5} />
+                <Td className="font-semibold tabular-nums text-content-muted">
                   {grandTotalCajas}
-                </td>
-                <td className="px-3 py-2 text-right font-semibold text-gray-500 text-xs border-r border-gray-100">
+                </Td>
+                <Td groupEnd className="whitespace-nowrap font-semibold tabular-nums text-content-muted">
                   {orderTotalCbm.toFixed(3)} m³
-                </td>
-                <td colSpan={6} className="px-3 py-2 text-right font-bold text-gray-600 text-sm">
+                </Td>
+                <Td colSpan={6} className="text-sm font-bold text-content">
                   TOTAL
-                </td>
-                <td className="px-3 py-2 text-right font-bold text-gray-600 text-xs">
+                </Td>
+                <Td className="font-bold tabular-nums text-content">
                   COP${fmtCOP(grandTotalFleteCop)}
-                </td>
-                <td />
-                <td className="px-3 py-2 text-right font-bold text-kuaizi-secondary text-sm border-r border-gray-100">
+                </Td>
+                <Td />
+                <Td groupEnd className="text-sm font-bold tabular-nums text-heading">
                   COP${fmtCOP(grandTotalCop)}
-                </td>
-                <td colSpan={3} />
+                </Td>
+                <Td colSpan={3} />
               </tr>
             </tbody>
           </table>
@@ -747,68 +686,57 @@ export function QuoteTable({
       )}
 
       {products.length === 0 && (
-        <p className="text-sm text-gray-400 text-center py-4">No hay productos en la cotizacion todavia.</p>
+        <p className="rounded-xl border border-dashed border-border-strong bg-surface px-4 py-8 text-center text-sm text-content-subtle">
+          No hay productos en la cotizacion todavia.
+        </p>
       )}
 
       {/* Share result */}
       {shareStatus === 'success' && sheetUrl && (
-        <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 flex items-center justify-between gap-3">
-          <p className="text-sm text-emerald-700 font-semibold">Sheet creado</p>
-          <a
-            href={sheetUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs font-semibold text-emerald-700 underline shrink-0"
-          >
-            Abrir Sheet &rarr;
-          </a>
-        </div>
+        <Alert
+          kind="success"
+          action={
+            <a
+              href={sheetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonClasses('outline', 'md')}
+            >
+              Abrir Sheet
+              <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+            </a>
+          }
+        >
+          <span className="font-semibold">Sheet creado</span>
+        </Alert>
       )}
-      {shareStatus === 'error' && shareError && (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-3">
-          <p className="text-sm text-red-600">{shareError}</p>
-        </div>
-      )}
+      {shareStatus === 'error' && shareError && <Alert kind="danger">{shareError}</Alert>}
 
       {/* Actions */}
-      <div className="flex gap-3 flex-wrap">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         {products.length > 0 && onShare && (
-          <button
-            type="button"
-            onClick={onShare}
-            disabled={shareStatus === 'sharing'}
-            className="flex-1 rounded-xl bg-kuaizi-secondary text-white py-3 text-sm font-semibold hover:bg-kuaizi-secondary/90 transition-colors disabled:opacity-50"
-          >
+          <Button onClick={onShare} disabled={shareStatus === 'sharing'} className="sm:min-w-[200px]">
             {shareStatus === 'sharing' ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+              <>
+                <Spinner size="sm" tone="current" />
                 Creando Sheet...
-              </span>
+              </>
             ) : shareStatus === 'success' ? (
               'Compartir de nuevo'
             ) : (
               'Compartir en Drive'
             )}
-          </button>
+          </Button>
         )}
         {products.length > 0 && (
-          <button
-            type="button"
-            onClick={copyAsText}
-            className="rounded-xl border border-gray-300 text-gray-600 px-4 py-3 text-sm font-semibold hover:bg-gray-50 transition-colors"
-            title="Copiar como texto"
-          >
+          <Button variant="outline" onClick={copyAsText} title="Copiar como texto">
             Copiar texto
-          </button>
+          </Button>
         )}
         {onNewQuote && (
-          <button
-            type="button"
-            onClick={onNewQuote}
-            className="flex-1 rounded-xl border border-gray-300 text-gray-600 py-3 text-sm font-semibold hover:bg-gray-50 transition-colors"
-          >
+          <Button variant="ghost" onClick={onNewQuote}>
             Nueva cotizacion
-          </button>
+          </Button>
         )}
       </div>
     </div>

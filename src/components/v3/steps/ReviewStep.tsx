@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSession } from '@/state/session/SessionProvider';
 import { calculateLandedCost } from '@/lib/calc/v3-landed';
 import { shareQuote } from '@/lib/scan/n8n';
+import { Button } from '@/components/ui/Button';
 import type { QuoteShareData } from '@/lib/scan/n8n';
 import { QuoteTable } from './QuoteTable';
 
@@ -90,10 +91,10 @@ export function ReviewStep() {
   };
 
   return (
-    <div className="space-y-5">
+    <section className="flex flex-col gap-6">
       <div>
-        <h2 className="text-lg font-bold text-kuaizi-ink">Cotizacion</h2>
-        <p className="text-sm text-gray-400 mt-0.5">Revisa los productos, exporta o agrega mas.</p>
+        <h2 className="text-xl font-bold text-heading">Cotizacion</h2>
+        <p className="mt-1 text-sm text-content-subtle">Revisa los productos, exporta o agrega mas.</p>
       </div>
 
       <QuoteTable
@@ -115,22 +116,14 @@ export function ReviewStep() {
         shareError={shareError}
       />
 
-      <div className="flex gap-3 flex-wrap">
-        <button
-          type="button"
-          onClick={() => dispatch({ type: 'SET_STEP', payload: 'product' })}
-          className="flex-1 rounded-xl border border-kuaizi-secondary text-kuaizi-secondary py-3 text-sm font-semibold hover:bg-kuaizi-secondary/5 transition-colors"
-        >
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        <Button variant="outline" onClick={() => dispatch({ type: 'SET_STEP', payload: 'product' })}>
           Agregar otro producto
-        </button>
-        <button
-          type="button"
-          onClick={() => dispatch({ type: 'SET_STEP', payload: 'supplier' })}
-          className="flex-1 rounded-xl border border-gray-300 text-gray-600 py-3 text-sm font-semibold hover:bg-gray-50 transition-colors"
-        >
+        </Button>
+        <Button variant="ghost" onClick={() => dispatch({ type: 'SET_STEP', payload: 'supplier' })}>
           Cambiar proveedor
-        </button>
+        </Button>
       </div>
-    </div>
+    </section>
   );
 }

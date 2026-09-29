@@ -14,12 +14,19 @@ interface InputClassOptions {
   invalid?: boolean;
   /** Denser height on desktop for inputs that live inside table cells. */
   compact?: boolean;
+  /** Width utility. Defaults to full width; pass e.g. `w-32` for inline inputs. */
+  widthClass?: string;
   className?: string;
 }
 
-export function inputClasses({ invalid = false, compact = false, className }: InputClassOptions = {}): string {
+export function inputClasses({
+  invalid = false,
+  compact = false,
+  widthClass = 'w-full',
+  className,
+}: InputClassOptions = {}): string {
   return [
-    'w-full rounded-xl border bg-surface px-3 text-base text-content outline-none transition-colors sm:text-sm',
+    `${widthClass} rounded-xl border bg-surface px-3 text-base text-content outline-none transition-colors sm:text-sm`,
     'placeholder:text-content-subtle',
     'disabled:cursor-not-allowed disabled:bg-surface-raised disabled:text-content-subtle',
     compact ? 'min-h-[44px] py-1.5 sm:min-h-[36px]' : 'min-h-[44px] py-2',
