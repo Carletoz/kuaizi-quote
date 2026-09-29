@@ -15,7 +15,7 @@ export function AppHeader() {
         </span>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-sm font-bold leading-tight text-heading sm:text-base">Cotizador</h1>
-          <p className="truncate text-xs text-content-subtle">Importación China a Colombia</p>
+          <p className="text-xs leading-snug text-content-subtle">Importación China a Colombia</p>
         </div>
         <ThemeToggle />
       </div>

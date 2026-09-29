@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useId } from 'react';
+import React, { useState, useEffect, useId, type ReactNode } from 'react';
 import { fieldLabelClass } from './fieldStyles';
 
 interface NumberFieldProps {
@@ -16,6 +16,8 @@ interface NumberFieldProps {
   readOnly?: boolean;
   /** Accessible name for fields whose visible label is rendered by the parent. */
   ariaLabel?: string;
+  /** Control shown at the right end of the label row, e.g. a currency switch. */
+  labelAccessory?: ReactNode;
 }
 
 export function NumberField({
@@ -32,6 +34,7 @@ export function NumberField({
   hint,
   readOnly = false,
   ariaLabel,
+  labelAccessory,
 }: NumberFieldProps) {
   const inputId = useId();
   const [text, setText] = useState(value === 0 ? '' : String(value));
@@ -59,15 +62,20 @@ export function NumberField({
 
   return (
     <div className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
-      {(label || hint) && (
-        <label htmlFor={inputId} className={fieldLabelClass}>
-          {label}
-          {hint && (
-            <span className="ml-1 text-xs font-normal text-content-subtle" title={hint}>
-              {' '}({hint})
-            </span>
+      {(label || hint || labelAccessory) && (
+        <div className="flex items-center justify-between gap-2">
+          {(label || hint) && (
+            <label htmlFor={inputId} className={fieldLabelClass}>
+              {label}
+              {hint && (
+                <span className="ml-1 text-xs font-normal text-content-subtle" title={hint}>
+                  {' '}({hint})
+                </span>
+              )}
+            </label>
           )}
-        </label>
+          {labelAccessory}
+        </div>
       )}
       <div className="flex min-h-[44px] min-w-0 items-stretch overflow-hidden rounded-xl border border-border-strong bg-surface transition-colors focus-within:border-accent focus-within:ring-1 focus-within:ring-accent">
         {prefix && <span className={`${addonClass} border-r border-border-strong`}>{prefix}</span>}
