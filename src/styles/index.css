@@ -2,8 +2,134 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  overflow-x: hidden;
+@layer base {
+  :root {
+    color-scheme: light;
+
+    /* Surfaces */
+    --bg: 250 250 247;          /* paper */
+    --surface: 255 255 255;
+    --surface-2: 248 249 251;
+    --surface-3: 241 243 246;
+
+    /* Content */
+    --content: 26 26 26;        /* ink */
+    --content-muted: 71 84 103;
+    --content-subtle: 108 118 132;
+    --content-invert: 255 255 255;
+    --heading: 29 53 87;        /* deep blue */
+
+    /* Borders */
+    --border: 226 230 236;
+    --border-strong: 205 211 220;
+
+    /* Brand — primary (orange) */
+    --primary: 240 120 32;      /* #F07820 */
+    --primary-hover: 222 106 22;
+    --primary-active: 199 92 16;
+    --primary-soft: 254 237 223;
+    --on-primary: 255 255 255;
+
+    /* Brand — secondary (deep blue) */
+    --secondary: 29 53 87;      /* #1D3557 */
+    --secondary-hover: 21 40 68;
+    --secondary-soft: 226 232 240;
+    --on-secondary: 255 255 255;
+
+    /* Brand — accent */
+    --accent: 69 123 157;       /* #457B9D */
+    --accent-soft: 224 236 243;
+
+    /* Feedback */
+    --success: 22 163 74;   --success-surface: 220 252 231;  --success-content: 22 101 52;
+    --warning: 217 119 6;   --warning-surface: 254 243 199;  --warning-content: 146 64 14;
+    --danger: 220 38 38;    --danger-surface: 254 226 226;   --danger-content: 153 27 27;
+    --info: 37 99 235;      --info-surface: 219 234 254;     --info-content: 30 64 175;
+
+    /* Categorical chart slots — identity, NOT status. Fixed order, never cycled.
+       Kept in sync with the sibling viability app; not used by the quote UI yet. */
+    --chart-1: 42 120 214;
+    --chart-2: 237 161 0;
+    --chart-3: 74 58 167;
+    --chart-4: 232 123 164;
+    --chart-5: 0 112 128;
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    /* Surfaces — deep navy derived from the brand secondary */
+    --bg: 13 20 33;
+    --surface: 22 33 52;
+    --surface-2: 28 41 62;
+    --surface-3: 34 48 71;
+
+    /* Content */
+    --content: 236 240 246;
+    --content-muted: 158 171 189;
+    --content-subtle: 122 136 156;
+    --content-invert: 13 20 33;
+    --heading: 233 238 245;
+
+    /* Borders */
+    --border: 45 60 84;
+    --border-strong: 61 78 104;
+
+    /* Brand — primary reads a touch brighter on dark */
+    --primary: 245 138 58;
+    --primary-hover: 250 155 82;
+    --primary-active: 235 124 40;
+    --primary-soft: 60 41 26;
+    --on-primary: 255 255 255;   /* keep white-on-orange brand look in both themes */
+
+    /* Brand — secondary becomes a light blue so it works as text/heading */
+    --secondary: 130 165 205;
+    --secondary-hover: 158 188 220;
+    --secondary-soft: 30 45 68;
+    --on-secondary: 13 20 33;
+
+    /* Brand — accent */
+    --accent: 122 162 191;
+    --accent-soft: 30 48 63;
+
+    /* Feedback — soft surfaces darkened, content lightened for contrast */
+    --success: 74 222 128;  --success-surface: 20 51 38;   --success-content: 134 239 172;
+    --warning: 251 191 36;  --warning-surface: 60 47 20;   --warning-content: 253 224 138;
+    --danger: 248 113 113;  --danger-surface: 60 28 28;    --danger-content: 254 178 178;
+    --info: 96 165 250;     --info-surface: 26 42 68;      --info-content: 147 197 253;
+
+    --chart-1: 57 135 229;
+    --chart-2: 201 133 0;
+    --chart-3: 144 133 233;
+    --chart-4: 213 81 129;
+    --chart-5: 45 156 170;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    overflow-x: hidden;
+    @apply bg-bg font-sans text-content antialiased;
+  }
+}
+
+@layer components {
+  /* Single source of truth for keyboard focus styling across the app. */
+  .focus-ring {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ─── Print / PDF export styles ────────────────────────────────────────────── */
