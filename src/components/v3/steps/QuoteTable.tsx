@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { TextField } from '@/components/ui/TextField';
 import { ArrowTopRightOnSquareIcon, XMarkIcon } from '@/components/ui/icons';
 import { inputClasses } from '@/components/ui/fieldStyles';
+import { FLETE_INTERNO_HELP, FLETE_INTERNO_LABEL } from '../copy';
 import { Breakdown, GroupTh, Td, Th } from '../quote/cells';
 import { ProductPhoto } from '../quote/ProductPhoto';
 import { RatesCard } from '../quote/RatesCard';
@@ -238,7 +239,8 @@ function RowDetail({
                 onChange={(e) => onDraftChange({ cbm: e.target.value })}
               />
               <TextField
-                label="Flete Interno China (¥ RMB)"
+                label={`${FLETE_INTERNO_LABEL} (¥ RMB)`}
+                hint={FLETE_INTERNO_HELP}
                 type="number"
                 step="0.01"
                 min={0}
