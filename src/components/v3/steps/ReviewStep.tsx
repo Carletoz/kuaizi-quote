@@ -100,7 +100,6 @@ export function ReviewStep() {
 
       <QuoteTable
         products={state.products}
-        suppliers={state.suppliers}
         trmCopUsd={state.trmCopUsd}
         cnyToUsd={state.cnyToUsd}
         ratesFetchedAt={state.ratesFetchedAt}

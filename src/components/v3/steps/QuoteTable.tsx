@@ -2,7 +2,7 @@ import { useState, Fragment } from 'react';
 import { calculateLandedCost } from '@/lib/calc/v3-landed';
 import type { LandedCostResult } from '@/lib/calc/v3-landed';
 import { ALL_HS_CATEGORIES, getHSCategory } from '@/data/hs-categories';
-import type { ProductEntry, SupplierEntry } from '@/state/session/types';
+import type { ProductEntry } from '@/state/session/types';
 import { Alert } from '@/components/ui/Alert';
 import { Button, buttonClasses } from '@/components/ui/Button';
 import { SelectField } from '@/components/ui/SelectField';
@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { TextField } from '@/components/ui/TextField';
 import { ArrowTopRightOnSquareIcon, XMarkIcon } from '@/components/ui/icons';
 import { inputClasses } from '@/components/ui/fieldStyles';
+import { FLETE_INTERNO_HELP, FLETE_INTERNO_LABEL } from '../copy';
 import { Breakdown, GroupTh, Td, Th } from '../quote/cells';
 import { ProductPhoto } from '../quote/ProductPhoto';
 import { RatesCard } from '../quote/RatesCard';
@@ -32,7 +33,6 @@ type ShareStatus = 'idle' | 'sharing' | 'success' | 'error';
 
 interface QuoteTableProps {
   products: ProductEntry[];
-  suppliers: SupplierEntry[];
   trmCopUsd: number;
   cnyToUsd: number;
   ratesFetchedAt: string | null;
@@ -238,7 +238,8 @@ function RowDetail({
                 onChange={(e) => onDraftChange({ cbm: e.target.value })}
               />
               <TextField
-                label="Flete Interno China (¥ RMB)"
+                label={`${FLETE_INTERNO_LABEL} (¥ RMB)`}
+                hint={FLETE_INTERNO_HELP}
                 type="number"
                 step="0.01"
                 min={0}
@@ -335,7 +336,6 @@ function RowDetail({
 
 export function QuoteTable({
   products,
-  suppliers,
   trmCopUsd,
   cnyToUsd,
   ratesFetchedAt,
@@ -354,6 +354,20 @@ export function QuoteTable({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<EditDraft | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [confirmingNew, setConfirmingNew] = useState(false);
+
+  // Starting over wipes the session, so ask first unless the quote is empty or already shared.
+  const newQuoteNeedsConfirm = products.length > 0 && shareStatus !== 'success';
+
+  const handleNewQuoteClick = () => {
+    if (newQuoteNeedsConfirm) setConfirmingNew(true);
+    else onNewQuote?.();
+  };
+
+  const confirmNewQuote = () => {
+    setConfirmingNew(false);
+    onNewQuote?.();
+  };
 
   const startEdit = (p: ProductEntry) => {
     setSaveError(null);
@@ -404,46 +418,6 @@ export function QuoteTable({
     const n = p.piezasPorCaja > 0 ? Math.round(p.quantity / p.piezasPorCaja) : 0;
     return sum + p.cbm * n;
   }, 0);
-
-  const copyAsText = () => {
-    const today = new Date().toLocaleDateString('es-CO');
-    const cnyDisplay = (1 / cnyToUsd).toFixed(4);
-    const bySupplier = new Map<string, typeof products>();
-    for (const p of products) {
-      const existing = bySupplier.get(p.supplierId) ?? [];
-      existing.push(p);
-      bySupplier.set(p.supplierId, existing);
-    }
-    const lines: string[] = [
-      `KUAIZI · Cotizacion ${today}`,
-      `TRM ${trmCopUsd.toLocaleString('es-CO')} COP/USD · CNY ${cnyDisplay}/USD`,
-      '',
-    ];
-    for (const [supplierId, prods] of bySupplier) {
-      const supplier = suppliers.find((s) => s.id === supplierId);
-      const tel = supplier?.tel ? ` ${supplier.tel}` : '';
-      lines.push(`[${supplier?.name ?? supplierId}${tel}]`);
-      for (const p of prods) {
-        const calc = calculateLandedCost({
-          unitPriceRmb: p.unitPriceRmb,
-          piezasPorCaja: p.piezasPorCaja,
-          cbm: p.cbm,
-          quantity: p.quantity,
-          trmCopUsd,
-          cnyToUsd,
-          arancelRate: p.arancelRate,
-          ivaRate: p.ivaRate,
-          fleteInternoChinaRmb: p.fleteInternoChinaRmb ?? 0,
-        });
-        lines.push(
-          `- ${p.name} x${p.quantity}  COP${fmtCOP(calc.precioUnidadFinalCop)}/u  = COP${fmtCOP(calc.precioTotalFinalCop)}`
-        );
-      }
-      lines.push('');
-    }
-    lines.push(`TOTAL: COP${fmtCOP(grandTotalCop)}`);
-    navigator.clipboard.writeText(lines.join('\n')).catch(() => {});
-  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -728,17 +702,41 @@ export function QuoteTable({
             )}
           </Button>
         )}
-        {products.length > 0 && (
-          <Button variant="outline" onClick={copyAsText} title="Copiar como texto">
-            Copiar texto
-          </Button>
-        )}
-        {onNewQuote && (
-          <Button variant="ghost" onClick={onNewQuote}>
-            Nueva cotizacion
+        {onNewQuote && !confirmingNew && (
+          <Button variant="ghost" onClick={handleNewQuoteClick}>
+            Nueva cotización
           </Button>
         )}
       </div>
+
+      {onNewQuote && confirmingNew && (
+        <div
+          role="group"
+          aria-labelledby="new-quote-confirm-title"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setConfirmingNew(false);
+          }}
+          className="flex flex-col gap-3 rounded-xl border border-warning/40 bg-warning-surface p-4"
+        >
+          <div className="flex flex-col gap-1">
+            <p id="new-quote-confirm-title" className="text-sm font-semibold text-warning-content">
+              ¿Empezar una cotización nueva?
+            </p>
+            <p className="text-sm text-warning-content">
+              Se borran los proveedores, productos y fotos de esta cotización, y no se puede deshacer.
+              Si quieres conservarla, compártela en Drive antes.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button variant="outline" autoFocus onClick={() => setConfirmingNew(false)}>
+              Cancelar
+            </Button>
+            <Button variant="secondary" onClick={confirmNewQuote}>
+              Borrar y empezar de nuevo
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

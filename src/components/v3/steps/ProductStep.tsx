@@ -9,9 +9,11 @@ import { ScanDropzone } from '@/components/ui/ScanDropzone';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { SelectField } from '@/components/ui/SelectField';
 import { TextField } from '@/components/ui/TextField';
+import { fieldHintClass } from '@/components/ui/fieldStyles';
 import { calculateLandedCost } from '@/lib/calc/v3-landed';
 import { ALL_HS_CATEGORIES, getHSCategory } from '@/data/hs-categories';
 import type { DimensionsSource } from '@/state/session/types';
+import { FLETE_INTERNO_HELP, FLETE_INTERNO_LABEL } from '../copy';
 
 type PriceCurrency = 'RMB' | 'USD';
 
@@ -283,7 +285,7 @@ export function ProductStep() {
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4">
           <div className="flex flex-col gap-1.5">
             <NumberField
               label="CBM / caja"
@@ -294,18 +296,21 @@ export function ProductStep() {
               min={0}
             />
             {scan.status === 'success' && (
-              <p className="text-xs text-content-subtle">{dimensionsLabel}</p>
+              <p className={fieldHintClass}>{dimensionsLabel}</p>
             )}
           </div>
-          <NumberField
-            label="Flete Interno China (¥)"
-            value={form.fleteInternoChinaRmb}
-            onChange={set('fleteInternoChinaRmb')}
-            prefix="¥"
-            hint="RMB"
-            step={0.01}
-            min={0}
-          />
+          <div className="flex flex-col gap-1.5">
+            <NumberField
+              label={FLETE_INTERNO_LABEL}
+              value={form.fleteInternoChinaRmb}
+              onChange={set('fleteInternoChinaRmb')}
+              prefix="¥"
+              hint="RMB"
+              step={0.01}
+              min={0}
+            />
+            <p className={fieldHintClass}>{FLETE_INTERNO_HELP}</p>
+          </div>
         </div>
 
         {/* HS Category selector */}
