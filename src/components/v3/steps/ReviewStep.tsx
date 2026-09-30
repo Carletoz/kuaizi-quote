@@ -75,6 +75,7 @@ export function ReviewStep() {
           name: s.name,
           tel: s.tel,
           location: s.location,
+          raw: s.raw,
           bitrixId: s.bitrixId,
         })),
         products,
