@@ -2,6 +2,7 @@ import { useSession } from '@/state/session/SessionProvider';
 import { AppHeader } from '@/components/App/AppHeader';
 import { Stepper } from '@/components/App/Stepper';
 import { containerWidthClass } from '@/lib/layout';
+import { SessionNotices } from './SessionNotices';
 import { SupplierStep } from './steps/SupplierStep';
 import { ProductStep } from './steps/ProductStep';
 import { ReviewStep } from './steps/ReviewStep';
@@ -22,6 +23,8 @@ export function QuoteWizard() {
       </div>
 
       <main className={`mx-auto w-full px-4 pb-12 pt-6 ${width}`}>
+        <SessionNotices />
+
         {/* Keyed so the enter animation replays once per step change */}
         <div key={state.step} className="animate-fade-in-up">
           {state.step === 'supplier' && <SupplierStep />}
