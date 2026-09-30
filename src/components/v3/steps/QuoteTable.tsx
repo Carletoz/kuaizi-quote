@@ -1,34 +1,18 @@
 import { useState, Fragment } from 'react';
-import { calculateLandedCost } from '@/lib/calc/v3-landed';
-import type { LandedCostResult } from '@/lib/calc/v3-landed';
-import { ALL_HS_CATEGORIES, getHSCategory } from '@/data/hs-categories';
 import type { ProductEntry } from '@/state/session/types';
 import { Alert } from '@/components/ui/Alert';
 import { Button, buttonClasses } from '@/components/ui/Button';
-import { SelectField } from '@/components/ui/SelectField';
 import { Spinner } from '@/components/ui/Spinner';
-import { TextField } from '@/components/ui/TextField';
 import { ArrowTopRightOnSquareIcon, XMarkIcon } from '@/components/ui/icons';
 import { inputClasses } from '@/components/ui/fieldStyles';
-import { FLETE_INTERNO_HELP, FLETE_INTERNO_LABEL } from '../copy';
 import { NewQuoteConfirm } from '../NewQuoteConfirm';
-import { Breakdown, GroupTh, Td, Th } from '../quote/cells';
-import { ProductPhoto } from '../quote/ProductPhoto';
+import { GroupTh, Td, Th } from '../quote/cells';
+import { draftToFields, seedDraft } from '../quote/editDraft';
+import type { EditDraft } from '../quote/editDraft';
+import { fmtCOP } from '../quote/format';
 import { RatesCard } from '../quote/RatesCard';
-
-const CUSTOM_HS = '__custom__';
-
-interface EditDraft {
-  name: string;
-  numCajas: string;
-  unitPriceRmb: string;
-  piezasPorCaja: string;
-  cbm: string;
-  hsCategoryId: string;
-  arancelRate: string;
-  ivaRate: string;
-  fleteInternoChinaRmb: string;
-}
+import { RowDetail } from '../quote/RowDetail';
+import { buildOrderTotals, buildRowModel } from '../quote/rowModel';
 
 type ShareStatus = 'idle' | 'sharing' | 'success' | 'error';
 
@@ -48,292 +32,10 @@ interface QuoteTableProps {
   shareError?: string;
 }
 
-function fmtCOP(n: number): string {
-  return Math.round(n).toLocaleString('es-CO');
-}
-
-function seedDraft(p: ProductEntry): EditDraft {
-  const arancelPct = Math.round(p.arancelRate * 100);
-  const ivaPct = Math.round(p.ivaRate * 100);
-  const numCajas = p.piezasPorCaja > 0 ? Math.round(p.quantity / p.piezasPorCaja) : 1;
-
-  const matchedCat = ALL_HS_CATEGORIES.find(
-    (cat) =>
-      Math.round(cat.arancelRate * 100) === arancelPct &&
-      Math.round(cat.ivaRate * 100) === ivaPct &&
-      (p.hsCategoryId ? cat.id === p.hsCategoryId : true)
-  );
-
-  return {
-    name: p.name,
-    numCajas: String(numCajas),
-    unitPriceRmb: String(p.unitPriceRmb),
-    piezasPorCaja: String(p.piezasPorCaja),
-    cbm: String(p.cbm),
-    hsCategoryId: matchedCat ? matchedCat.id : CUSTOM_HS,
-    arancelRate: String(arancelPct),
-    ivaRate: String(ivaPct),
-    fleteInternoChinaRmb: String(p.fleteInternoChinaRmb ?? 0),
-  };
-}
-
-function draftToFields(d: EditDraft): Partial<ProductEntry> | null {
-  const numCajas = parseInt(d.numCajas, 10);
-  const unitPriceRmb = parseFloat(d.unitPriceRmb);
-  const piezasPorCaja = parseFloat(d.piezasPorCaja);
-
-  if (!d.name.trim()) return null;
-  if (!numCajas || numCajas <= 0) return null;
-  if (!unitPriceRmb || unitPriceRmb <= 0) return null;
-
-  const quantity = piezasPorCaja > 0 ? numCajas * piezasPorCaja : numCajas;
-  const arancelPct = Math.min(100, Math.max(0, parseFloat(d.arancelRate) || 0));
-  const ivaPct = Math.min(100, Math.max(0, parseFloat(d.ivaRate) || 0));
-  const cbm = parseFloat(d.cbm);
-  const fleteInternoChinaRmb = parseFloat(d.fleteInternoChinaRmb) || 0;
-
-  const fields: Partial<ProductEntry> = {
-    name: d.name.trim(),
-    quantity,
-    unitPriceRmb,
-    piezasPorCaja: piezasPorCaja > 0 ? piezasPorCaja : undefined,
-    cbm: cbm > 0 ? cbm : undefined,
-    arancelRate: arancelPct / 100,
-    ivaRate: ivaPct / 100,
-    fleteInternoChinaRmb,
-  };
-
-  if (d.hsCategoryId !== CUSTOM_HS && d.hsCategoryId !== '') {
-    fields.hsCategoryId = d.hsCategoryId;
-  }
-
-  return fields;
-}
-
-/**
- * Numeric values read from the edit draft, falling back to the saved product.
- * Shared by the row calculation and the detail panel so both agree.
- */
-function deriveDraftValues(p: ProductEntry, draft: EditDraft | null) {
-  return {
-    numCajas: draft ? (parseInt(draft.numCajas, 10) || 0) : 0,
-    piezasPorCaja: draft ? (parseFloat(draft.piezasPorCaja) || p.piezasPorCaja) : p.piezasPorCaja,
-    cbm: draft ? (parseFloat(draft.cbm) || p.cbm) : p.cbm,
-    fleteInterno: draft ? (parseFloat(draft.fleteInternoChinaRmb) || 0) : (p.fleteInternoChinaRmb ?? 0),
-  };
-}
-
-type DraftValues = ReturnType<typeof deriveDraftValues>;
-
 // Text-style actions that live inside table cells. `-my-1.5` cancels the cell
 // padding so the 44px touch target does not inflate the row.
 const ROW_LINK_CLASS =
   'focus-ring -my-1.5 inline-flex min-h-[44px] items-center rounded px-2 text-xs font-semibold text-secondary underline underline-offset-4 hover:text-secondary-hover';
-
-interface RowDetailProps {
-  product: ProductEntry;
-  file: File | undefined;
-  calc: LandedCostResult;
-  /** Non-null only while this row is being edited. */
-  draft: EditDraft | null;
-  draftValues: DraftValues;
-  onDraftChange: (patch: Partial<EditDraft>) => void;
-  saveError: string | null;
-  onStartEdit: () => void;
-  onSave: () => void;
-  onCancel: () => void;
-  sellingPrice: string;
-  onSellingPriceChange: (value: string) => void;
-  rentabilidad: number | null;
-}
-
-/** Expanded row: cost breakdown + profitability, or the edit form with a live preview. */
-function RowDetail({
-  product,
-  file,
-  calc,
-  draft,
-  draftValues,
-  onDraftChange,
-  saveError,
-  onStartEdit,
-  onSave,
-  onCancel,
-  sellingPrice,
-  onSellingPriceChange,
-  rentabilidad,
-}: RowDetailProps) {
-  const handleHsChange = (v: string) => {
-    if (v === CUSTOM_HS) {
-      onDraftChange({ hsCategoryId: CUSTOM_HS });
-      return;
-    }
-    const cat = ALL_HS_CATEGORIES.find((c) => c.id === v);
-    if (cat) {
-      onDraftChange({
-        hsCategoryId: v,
-        arancelRate: String(Math.round(cat.arancelRate * 100)),
-        ivaRate: String(Math.round(cat.ivaRate * 100)),
-      });
-    }
-  };
-
-  const hsOptions = [
-    ...ALL_HS_CATEGORIES.map((cat) => ({ value: cat.id, label: cat.label })),
-    { value: CUSTOM_HS, label: 'Personalizado' },
-  ];
-
-  return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      {/* Left: image + edit form or desglose */}
-      <div className="space-y-3 rounded-xl border border-border bg-surface p-4">
-        {file && <ProductPhoto file={file} />}
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold text-heading">{draft ? 'Editar producto' : 'Desglose DDP'}</h3>
-          {!draft && (
-            <Button variant="link" size="sm" onClick={onStartEdit}>
-              Editar
-            </Button>
-          )}
-        </div>
-
-        {draft ? (
-          <div className="space-y-4">
-            <TextField
-              label="Nombre del producto"
-              value={draft.name}
-              onChange={(e) => onDraftChange({ name: e.target.value })}
-            />
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <TextField
-                label="# Cajas"
-                type="number"
-                min={1}
-                step={1}
-                value={draft.numCajas}
-                onChange={(e) => onDraftChange({ numCajas: e.target.value })}
-                hint={
-                  draftValues.numCajas > 0 && draftValues.piezasPorCaja > 0
-                    ? `= ${draftValues.numCajas * draftValues.piezasPorCaja} piezas · ${(draftValues.cbm * draftValues.numCajas).toFixed(3)} m³ CBM total`
-                    : undefined
-                }
-              />
-              <TextField
-                label="Precio unitario (¥ RMB)"
-                type="number"
-                value={draft.unitPriceRmb}
-                onChange={(e) => onDraftChange({ unitPriceRmb: e.target.value })}
-              />
-              <TextField
-                label="Piezas / caja"
-                type="number"
-                value={draft.piezasPorCaja}
-                onChange={(e) => onDraftChange({ piezasPorCaja: e.target.value })}
-              />
-              <TextField
-                label="CBM / caja"
-                type="number"
-                step="0.001"
-                value={draft.cbm}
-                onChange={(e) => onDraftChange({ cbm: e.target.value })}
-              />
-              <TextField
-                label={`${FLETE_INTERNO_LABEL} (¥ RMB)`}
-                hint={FLETE_INTERNO_HELP}
-                type="number"
-                step="0.01"
-                min={0}
-                value={draft.fleteInternoChinaRmb}
-                onChange={(e) => onDraftChange({ fleteInternoChinaRmb: e.target.value })}
-                wrapperClassName="sm:col-span-2"
-              />
-            </div>
-
-            <SelectField
-              label="Categoria arancelaria"
-              value={draft.hsCategoryId}
-              options={hsOptions}
-              onChange={handleHsChange}
-            />
-
-            {draft.hsCategoryId === CUSTOM_HS && (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <TextField
-                  label="Arancel (%)"
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={draft.arancelRate}
-                  onChange={(e) => onDraftChange({ arancelRate: e.target.value })}
-                />
-                <TextField
-                  label="IVA (%)"
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={draft.ivaRate}
-                  onChange={(e) => onDraftChange({ ivaRate: e.target.value })}
-                />
-              </div>
-            )}
-
-            {saveError && <Alert kind="danger">{saveError}</Alert>}
-
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={onSave} disabled={draftToFields(draft) === null}>
-                Guardar
-              </Button>
-              <Button variant="outline" onClick={onCancel}>
-                Cancelar
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <Breakdown calc={calc} fleteInternoChinaRmb={product.fleteInternoChinaRmb ?? 0} />
-        )}
-      </div>
-
-      {/* Right: rentabilidad / live preview when editing */}
-      <div className="space-y-3 rounded-xl border border-border bg-surface p-4">
-        {draft ? (
-          <>
-            <h3 className="text-sm font-semibold text-heading">Vista previa</h3>
-            <Breakdown calc={calc} fleteInternoChinaRmb={draftValues.fleteInterno} />
-          </>
-        ) : (
-          <>
-            <h3 className="text-sm font-semibold text-heading">Rentabilidad</h3>
-            <p className="text-sm text-content-muted">
-              Costo unidad: COP${fmtCOP(calc.precioUnidadFinalCop)}
-            </p>
-            <TextField
-              label="Precio de venta (COP / u)"
-              inputMode="decimal"
-              value={sellingPrice}
-              onChange={(e) => onSellingPriceChange(e.target.value)}
-              placeholder="Ej: 25000"
-            />
-            {rentabilidad !== null && (
-              <div
-                className={`flex items-center justify-between rounded-lg border px-3 py-2 ${
-                  rentabilidad >= 0
-                    ? 'border-success/40 bg-success-surface text-success-content'
-                    : 'border-danger/40 bg-danger-surface text-danger-content'
-                }`}
-              >
-                <span className="text-sm font-semibold">Rentabilidad</span>
-                <span className="text-base font-bold tabular-nums">
-                  {rentabilidad >= 0 ? '+' : ''}{rentabilidad.toFixed(2)}%
-                </span>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
 
 export function QuoteTable({
   products,
@@ -395,30 +97,11 @@ export function QuoteTable({
     setSaveError(null);
   };
 
-  const orderCalcs = products.map((p) =>
-    calculateLandedCost({
-      unitPriceRmb: p.unitPriceRmb,
-      piezasPorCaja: p.piezasPorCaja,
-      cbm: p.cbm,
-      quantity: p.quantity,
-      trmCopUsd,
-      cnyToUsd,
-      arancelRate: p.arancelRate,
-      ivaRate: p.ivaRate,
-      fleteInternoChinaRmb: p.fleteInternoChinaRmb ?? 0,
-    })
+  const rates = { trmCopUsd, cnyToUsd };
+  const rows = products.map((p) =>
+    buildRowModel(p, editingId === p.id ? draft : null, rates, sellingPrices[p.id] ?? '')
   );
-
-  const grandTotalCop = orderCalcs.reduce((sum, c) => sum + c.precioTotalFinalCop, 0);
-  const grandTotalCajas = products.reduce((sum, p) => {
-    return sum + (p.piezasPorCaja > 0 ? Math.round(p.quantity / p.piezasPorCaja) : 0);
-  }, 0);
-  const grandTotalFleteCop = orderCalcs.reduce((sum, c) => sum + c.fleteImpuestosCop, 0);
-
-  const orderTotalCbm = products.reduce((sum, p) => {
-    const n = p.piezasPorCaja > 0 ? Math.round(p.quantity / p.piezasPorCaja) : 0;
-    return sum + p.cbm * n;
-  }, 0);
+  const { grandTotalCop, grandTotalCajas, grandTotalFleteCop, orderTotalCbm } = buildOrderTotals(products, rates);
 
   return (
     <div className="flex flex-col gap-4">
@@ -477,50 +160,10 @@ export function QuoteTable({
               </tr>
             </thead>
             <tbody>
-              {products.map((p, idx) => {
+              {rows.map((row, idx) => {
+                const { product: p, isEditing, draftValues: dv, calc, numCajas, totalCbm, hsCode, rentabilidad } = row;
+                const rawSellingPrice = row.sellingPrice;
                 const isExpanded = expandedId === p.id;
-                const isEditing = editingId === p.id && draft !== null;
-
-                const dv = deriveDraftValues(p, draft);
-
-                const draftProduct: ProductEntry = isEditing
-                  ? {
-                      ...p,
-                      name: draft.name || p.name,
-                      quantity: dv.numCajas * dv.piezasPorCaja || p.quantity,
-                      unitPriceRmb: parseFloat(draft.unitPriceRmb) || p.unitPriceRmb,
-                      piezasPorCaja: dv.piezasPorCaja,
-                      cbm: dv.cbm,
-                      arancelRate: Math.min(100, Math.max(0, parseFloat(draft.arancelRate) || 0)) / 100,
-                      ivaRate: Math.min(100, Math.max(0, parseFloat(draft.ivaRate) || 0)) / 100,
-                      fleteInternoChinaRmb: dv.fleteInterno,
-                    }
-                  : p;
-
-                const calc = calculateLandedCost({
-                  unitPriceRmb: draftProduct.unitPriceRmb,
-                  piezasPorCaja: draftProduct.piezasPorCaja,
-                  cbm: draftProduct.cbm,
-                  quantity: draftProduct.quantity,
-                  trmCopUsd,
-                  cnyToUsd,
-                  arancelRate: draftProduct.arancelRate,
-                  ivaRate: draftProduct.ivaRate,
-                  fleteInternoChinaRmb: draftProduct.fleteInternoChinaRmb ?? 0,
-                });
-
-                const numCajas = p.piezasPorCaja > 0 ? Math.round(p.quantity / p.piezasPorCaja) : 0;
-                const totalCbm = p.cbm * numCajas;
-
-                const hsCat = p.hsCategoryId ? getHSCategory(p.hsCategoryId) : undefined;
-                const hsCode = hsCat?.exampleHSCodes[0] ?? '—';
-
-                const rawSellingPrice = sellingPrices[p.id] ?? '';
-                const sellingPriceCop = parseFloat(rawSellingPrice.replace(/,/g, '.'));
-                const rentabilidad =
-                  !isNaN(sellingPriceCop) && sellingPriceCop > 0 && calc.precioUnidadFinalCop > 0
-                    ? ((sellingPriceCop - calc.precioUnidadFinalCop) / calc.precioUnidadFinalCop) * 100
-                    : null;
 
                 const file = entityFiles?.get(p.id);
                 const setSellingPrice = (value: string) =>
