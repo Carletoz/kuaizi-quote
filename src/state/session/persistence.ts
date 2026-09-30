@@ -270,6 +270,23 @@ export function saveSession(storage: StorageLike, state: SessionState, now: Date
 }
 
 // ---------------------------------------------------------------------------
+// Other-tab writes
+// ---------------------------------------------------------------------------
+
+/**
+ * True when a `storage` event means another tab changed the saved quote: the
+ * quote key was written or removed, or localStorage was cleared (`key === null`).
+ * The event never fires in the tab that made the change.
+ */
+export function isQuoteChangeEvent(
+  event: { key: string | null; storageArea: unknown },
+  local: unknown,
+): boolean {
+  if (event.key !== null && event.key !== SESSION_STORAGE_KEY) return false;
+  return event.storageArea === null || event.storageArea === local;
+}
+
+// ---------------------------------------------------------------------------
 // Per-tab marker (sessionStorage)
 // ---------------------------------------------------------------------------
 

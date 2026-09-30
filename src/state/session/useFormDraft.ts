@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { getLocalStorage } from './persistence';
 import { isPristine, readDraft, removeDraft, writeDraft } from './drafts';
+import { useSession } from './SessionProvider';
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -13,6 +14,9 @@ type Updater<T> = T | ((prev: T) => T);
  * outlives deploys. A form equal to `initial` is removed from storage rather
  * than written.
  *
+ * While another tab owns the saved quote (`storageConflict`) the form keeps
+ * working in memory but stops writing, so it never overwrites that tab's draft.
+ *
  * Returns `[value, setValue, reset]`; `reset` returns the form to `initial` and
  * clears its stored draft (use it after the entry is confirmed).
  */
@@ -21,6 +25,10 @@ export function useFormDraft<T extends object>(
   initial: T,
   sanitize: (raw: Record<string, unknown>) => T,
 ): [T, (next: Updater<T>) => void, () => void] {
+  const { storageConflict } = useSession();
+  const blockedRef = useRef(storageConflict);
+  blockedRef.current = storageConflict;
+
   const [value, setValue] = useState<T>(() => {
     const storage = getLocalStorage();
     return (storage && readDraft(storage, key, sanitize)) || initial;
@@ -36,7 +44,7 @@ export function useFormDraft<T extends object>(
       setValue(resolved);
 
       const storage = getLocalStorage();
-      if (!storage) return;
+      if (!storage || blockedRef.current) return;
       if (isPristine(resolved, initial)) removeDraft(storage, key);
       else writeDraft(storage, key, resolved);
     },

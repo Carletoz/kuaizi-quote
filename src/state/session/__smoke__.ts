@@ -27,6 +27,7 @@ import {
   TAB_ACTIVE_KEY,
   contentSignature,
   hasContent,
+  isQuoteChangeEvent,
   isQuotaError,
   loadSession,
   markTabActive,
@@ -293,6 +294,18 @@ run('tab marker: absent on a new tab, present after marking, safe when storage t
 
   assert(wasTabActive(new FakeStorage({ getError: new Error('x') })), 'unreadable storage suppresses the notice');
   markTabActive(new FakeStorage({ setError: new Error('x') }));
+});
+
+run('other-tab write detection: only the quote key (or a clear) in localStorage counts', () => {
+  const local = new FakeStorage();
+  const other = new FakeStorage();
+
+  assert(isQuoteChangeEvent({ key: SESSION_STORAGE_KEY, storageArea: local }, local), 'quote key written');
+  assert(isQuoteChangeEvent({ key: null, storageArea: local }, local), 'localStorage cleared');
+  assert(!isQuoteChangeEvent({ key: PRODUCT_DRAFT_KEY, storageArea: local }, local), 'a draft key is ignored');
+  assert(!isQuoteChangeEvent({ key: 'kuaizi-theme', storageArea: local }, local), 'an unrelated key is ignored');
+  assert(!isQuoteChangeEvent({ key: SESSION_STORAGE_KEY, storageArea: other }, local), 'another storage area');
+  assert(!isQuoteChangeEvent({ key: SESSION_STORAGE_KEY, storageArea: local }, null), 'localStorage unavailable here');
 });
 
 // ---------------------------------------------------------------------------

@@ -32,12 +32,24 @@ function ResumeNotice({ savedAt }: { savedAt: string }) {
  * Kept at the stepper's phone-width measure so they stay readable on the wide review step.
  */
 export function SessionNotices() {
-  const { storageWarning, resumeSavedAt } = useSession();
+  const { storageWarning, storageConflict, resumeSavedAt } = useSession();
 
-  if (!storageWarning && !resumeSavedAt) return null;
+  if (!storageWarning && !storageConflict && !resumeSavedAt) return null;
 
   return (
     <div className="mb-6 flex max-w-lg flex-col gap-3">
+      {storageConflict && (
+        <Alert
+          kind="warning"
+          action={
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Recargar
+            </Button>
+          }
+        >
+          Esta cotización cambió en otra pestaña. Recarga para ver los cambios.
+        </Alert>
+      )}
       {resumeSavedAt && <ResumeNotice savedAt={resumeSavedAt} />}
       {storageWarning && <Alert kind="warning">{storageWarning}</Alert>}
     </div>

@@ -7,6 +7,7 @@ import {
   contentSignature,
   getLocalStorage,
   getSessionStorage,
+  isQuoteChangeEvent,
   isQuotaError,
   loadSession,
   markTabActive,
@@ -59,6 +60,11 @@ interface SessionContextValue {
   /** ISO time of the saved quote being offered for resuming, or null when no notice should show. */
   resumeSavedAt: string | null;
   dismissResumeNotice: () => void;
+  /**
+   * True once another tab has written the saved quote. localStorage is shared and
+   * last write wins, so this tab stops writing until it is reloaded.
+   */
+  storageConflict: boolean;
   /** Bumps on every new quote so the wizard can remount steps that hold local form state. */
   quoteEpoch: number;
   setEntityFile: (id: string, file: File) => void;
@@ -78,6 +84,23 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [imageQuotaHit, setImageQuotaHit] = useState(false);
   const [resumeSavedAt, setResumeSavedAt] = useState<string | null>(() => boot().resumeSavedAt);
   const [quoteEpoch, setQuoteEpoch] = useState(0);
+
+  // Mirrors `storageConflict` for code that must not wait for a re-render (saves, photo and draft writes).
+  const conflictRef = useRef(false);
+  const [storageConflict, setStorageConflict] = useState(false);
+
+  // The `storage` event fires only in the *other* tabs. If one of them wrote the
+  // saved quote (or cleared storage), what this tab holds is stale: stop writing
+  // so we never overwrite their data, and ask the user to reload.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (!isQuoteChangeEvent(e, getLocalStorage())) return;
+      conflictRef.current = true;
+      setStorageConflict(true);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   // From now on this tab counts as active, so reloading it does not offer the resume notice again.
   useEffect(() => {
@@ -105,6 +128,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const setEntityFile = useCallback((id: string, file: File) => {
     filesRef.current.set(id, file);
+    if (conflictRef.current) return;
     saveImage(id, file)
       .then(() => setImageQuotaHit(false))
       .catch((err: unknown) => {
@@ -117,6 +141,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const clearEntityFiles = useCallback(() => {
     filesRef.current.clear();
+    // In conflict the shared photo store belongs to the other tab's quote too: leave it alone.
+    if (conflictRef.current) return;
     clearImages().catch(() => {});
   }, []);
 
@@ -125,7 +151,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const startNewQuote = useCallback(() => {
     clearEntityFiles();
     const storage = getLocalStorage();
-    if (storage) clearAllDrafts(storage);
+    if (storage && !conflictRef.current) clearAllDrafts(storage);
     setStateQuotaHit(false);
     setImageQuotaHit(false);
     setResumeSavedAt(null);
@@ -138,6 +164,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const lastSavedRef = useRef<string>(contentSignature(state));
 
   useEffect(() => {
+    if (conflictRef.current) return;
     const signature = contentSignature(state);
     if (signature === lastSavedRef.current) return;
     const storage = getLocalStorage();
@@ -190,6 +217,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         storageWarning,
         resumeSavedAt,
         dismissResumeNotice,
+        storageConflict,
         quoteEpoch,
         setEntityFile,
         getEntityFiles,
