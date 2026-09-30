@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSession } from '@/state/session/SessionProvider';
+import { referencedEntityIds } from '@/state/session/persistence';
 import { calculateLandedCost } from '@/lib/calc/v3-landed';
 import { shareQuote } from '@/lib/scan/n8n';
 import { Button } from '@/components/ui/Button';
@@ -9,13 +10,15 @@ import { QuoteTable } from './QuoteTable';
 type ShareStatus = 'idle' | 'sharing' | 'success' | 'error';
 
 export function ReviewStep() {
-  const { state, dispatch, getEntityFiles, startNewQuote } = useSession();
+  const { state, dispatch, getEntityFiles, removeEntityFile, startNewQuote } = useSession();
   const [shareStatus, setShareStatus] = useState<ShareStatus>('idle');
   const [sheetUrl, setSheetUrl] = useState<string | undefined>();
   const [shareError, setShareError] = useState<string | undefined>();
 
   const handleRemove = (id: string) => {
     dispatch({ type: 'REMOVE_PRODUCT', payload: { id } });
+    // A product's photo is stored under the product id.
+    removeEntityFile(id);
   };
 
   const handleNewQuote = () => {
@@ -80,7 +83,12 @@ export function ReviewStep() {
         products,
       };
 
-      const { sheetUrl: url } = await shareQuote(quoteData, getEntityFiles());
+      // Photos are stored under supplier and product ids. Upload only those that
+      // belong to this quote: the n8n flow makes every uploaded photo public.
+      const referenced = referencedEntityIds(state);
+      const files = new Map(Array.from(getEntityFiles()).filter(([id]) => referenced.has(id)));
+
+      const { sheetUrl: url } = await shareQuote(quoteData, files);
       setSheetUrl(url);
       setShareStatus('success');
       window.open(url, '_blank', 'noopener');

@@ -125,6 +125,12 @@ export function referencedEntityIds(state: SessionState): Set<string> {
   return ids;
 }
 
+/** Stored photo ids that no supplier or product in `state` owns. */
+export function findOrphanIds(storedIds: Iterable<string>, state: SessionState): string[] {
+  const referenced = referencedEntityIds(state);
+  return Array.from(storedIds).filter((id) => !referenced.has(id));
+}
+
 // ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------

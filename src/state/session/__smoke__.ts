@@ -26,6 +26,7 @@ import {
   SESSION_VERSION,
   TAB_ACTIVE_KEY,
   contentSignature,
+  findOrphanIds,
   hasContent,
   isQuoteChangeEvent,
   isQuotaError,
@@ -283,6 +284,22 @@ run('content helpers', () => {
   assert(contentSignature({ ...filled, step: 'product' }) !== contentSignature(filled), 'step changes it');
 
   assertEqual(Array.from(referencedEntityIds(filled)).sort(), ['p-1', 's-1'], 'supplier and product ids');
+});
+
+run('orphan photos: only ids owned by a supplier or a product are kept', () => {
+  const stored = ['s-1', 'p-1', 'ghost-1', 'ghost-2'];
+  assertEqual(findOrphanIds(stored, filled), ['ghost-1', 'ghost-2'], 'orphans next to a live quote');
+  assertEqual(findOrphanIds(stored, initialSessionState), stored, 'everything is orphaned without a quote');
+  assertEqual(findOrphanIds([], filled), [], 'nothing stored');
+
+  // A removed product frees its photo; the supplier photo stays.
+  const afterRemoval: SessionState = { ...filled, products: [] };
+  assertEqual(findOrphanIds(stored, afterRemoval), ['p-1', 'ghost-1', 'ghost-2'], 'removed product photo');
+
+  // The share filter uses the same ids: a Map keeps only owned photos.
+  const files = new Map(stored.map((id) => [id, id] as const));
+  const owned = Array.from(files).filter(([id]) => referencedEntityIds(filled).has(id)).map(([id]) => id);
+  assertEqual(owned, ['s-1', 'p-1'], 'files sent to the share flow');
 });
 
 run('tab marker: absent on a new tab, present after marking, safe when storage throws', () => {

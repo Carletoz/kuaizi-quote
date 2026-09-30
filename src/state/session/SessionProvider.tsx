@@ -1,10 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react';
 import { sessionReducer, initialSessionState } from './reducer';
 import type { SessionState, SessionAction } from './types';
-import { saveImage, loadAllImages, clearImages } from '@/lib/imageDb';
+import { saveImage, loadAllImages, clearImages, deleteImages } from '@/lib/imageDb';
 import { clearAllDrafts } from './drafts';
 import {
   contentSignature,
+  findOrphanIds,
   getLocalStorage,
   getSessionStorage,
   isQuoteChangeEvent,
@@ -69,6 +70,8 @@ interface SessionContextValue {
   quoteEpoch: number;
   setEntityFile: (id: string, file: File) => void;
   getEntityFiles: () => ReadonlyMap<string, File>;
+  /** Drops one photo (memory and IndexedDB), e.g. when its product is removed. */
+  removeEntityFile: (id: string) => void;
   clearEntityFiles: () => void;
   /** The single start-over action: wipes photos and resets the session (rates are kept). */
   startNewQuote: () => void;
@@ -117,13 +120,37 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Latest state for effects that run once but must judge against what is on screen now.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  // Load the stored photos, dropping orphans: a photo belongs to a supplier or a
+  // product id, so anything else is left over from a quote that no longer exists
+  // (a closed tab, a discarded save) and must not linger or be uploaded.
   useEffect(() => {
+    let cancelled = false;
+
     loadAllImages()
       .then((map) => {
-        map.forEach((file, id) => filesRef.current.set(id, file));
+        if (cancelled) return;
+        // If the saved quote could not be read at all we cannot tell what is referenced, so keep every photo.
+        const canJudge = boot().load.status !== 'unavailable';
+        const orphanIds = canJudge ? findOrphanIds(map.keys(), stateRef.current) : [];
+        const orphans = new Set(orphanIds);
+        map.forEach((file, id) => {
+          if (orphans.has(id)) filesRef.current.delete(id);
+          else filesRef.current.set(id, file);
+        });
+        if (orphanIds.length > 0 && !conflictRef.current) deleteImages(orphanIds).catch(() => {});
       })
       .catch(() => {})
-      .finally(() => setImagesReady(true));
+      .finally(() => {
+        if (!cancelled) setImagesReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const setEntityFile = useCallback((id: string, file: File) => {
@@ -138,6 +165,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getEntityFiles = useCallback(() => filesRef.current as ReadonlyMap<string, File>, []);
+
+  const removeEntityFile = useCallback((id: string) => {
+    filesRef.current.delete(id);
+    if (conflictRef.current) return;
+    deleteImages([id]).catch(() => {});
+  }, []);
 
   const clearEntityFiles = useCallback(() => {
     filesRef.current.clear();
@@ -221,6 +254,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         quoteEpoch,
         setEntityFile,
         getEntityFiles,
+        removeEntityFile,
         clearEntityFiles,
         startNewQuote,
       }}
