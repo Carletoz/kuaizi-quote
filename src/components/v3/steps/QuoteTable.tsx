@@ -11,6 +11,7 @@ import { TextField } from '@/components/ui/TextField';
 import { ArrowTopRightOnSquareIcon, XMarkIcon } from '@/components/ui/icons';
 import { inputClasses } from '@/components/ui/fieldStyles';
 import { FLETE_INTERNO_HELP, FLETE_INTERNO_LABEL } from '../copy';
+import { NewQuoteConfirm } from '../NewQuoteConfirm';
 import { Breakdown, GroupTh, Td, Th } from '../quote/cells';
 import { ProductPhoto } from '../quote/ProductPhoto';
 import { RatesCard } from '../quote/RatesCard';
@@ -710,32 +711,7 @@ export function QuoteTable({
       </div>
 
       {onNewQuote && confirmingNew && (
-        <div
-          role="group"
-          aria-labelledby="new-quote-confirm-title"
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setConfirmingNew(false);
-          }}
-          className="flex flex-col gap-3 rounded-xl border border-warning/40 bg-warning-surface p-4"
-        >
-          <div className="flex flex-col gap-1">
-            <p id="new-quote-confirm-title" className="text-sm font-semibold text-warning-content">
-              ¿Empezar una cotización nueva?
-            </p>
-            <p className="text-sm text-warning-content">
-              Se borran los proveedores, productos y fotos de esta cotización, y no se puede deshacer.
-              Si quieres conservarla, compártela en Drive antes.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button variant="outline" autoFocus onClick={() => setConfirmingNew(false)}>
-              Cancelar
-            </Button>
-            <Button variant="secondary" onClick={confirmNewQuote}>
-              Borrar y empezar de nuevo
-            </Button>
-          </div>
-        </div>
+        <NewQuoteConfirm onCancel={() => setConfirmingNew(false)} onConfirm={confirmNewQuote} />
       )}
     </div>
   );

@@ -9,7 +9,7 @@ import { QuoteTable } from './QuoteTable';
 type ShareStatus = 'idle' | 'sharing' | 'success' | 'error';
 
 export function ReviewStep() {
-  const { state, dispatch, getEntityFiles, clearEntityFiles } = useSession();
+  const { state, dispatch, getEntityFiles, startNewQuote } = useSession();
   const [shareStatus, setShareStatus] = useState<ShareStatus>('idle');
   const [sheetUrl, setSheetUrl] = useState<string | undefined>();
   const [shareError, setShareError] = useState<string | undefined>();
@@ -19,8 +19,7 @@ export function ReviewStep() {
   };
 
   const handleNewQuote = () => {
-    clearEntityFiles();
-    dispatch({ type: 'RESET_SESSION' });
+    startNewQuote();
     setShareStatus('idle');
     setSheetUrl(undefined);
   };

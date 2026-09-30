@@ -5,27 +5,46 @@ import { saveImage, loadAllImages, clearImages } from '@/lib/imageDb';
 import {
   contentSignature,
   getLocalStorage,
+  getSessionStorage,
   isQuotaError,
   loadSession,
+  markTabActive,
   saveSession,
+  wasTabActive,
   type LoadResult,
 } from './persistence';
 
 export const STORAGE_FULL_MESSAGE =
   'No hay espacio para guardar tu cotización. Comparte en Drive antes de cerrar esta pestaña.';
 
+interface Boot {
+  load: LoadResult;
+  /** ISO time of the saved quote, only when it should be offered for resuming (see below). */
+  resumeSavedAt: string | null;
+}
+
 /**
  * The saved quote is read once per page load. Memoised at module level because
  * React StrictMode runs state initialisers twice in development.
+ *
+ * The resume notice is offered only when a saved quote exists and this tab has
+ * not been open before: a plain reload keeps the sessionStorage marker, a new
+ * tab or a new browser session does not.
  */
-let bootCache: LoadResult | null = null;
+let bootCache: Boot | null = null;
 
-function boot(): LoadResult {
+function boot(): Boot {
   if (!bootCache) {
-    const storage = getLocalStorage();
-    bootCache = storage
-      ? loadSession(storage)
+    const local = getLocalStorage();
+    const load: LoadResult = local
+      ? loadSession(local)
       : { status: 'unavailable', state: initialSessionState, savedAt: null };
+    const session = getSessionStorage();
+    const tabWasActive = session ? wasTabActive(session) : true;
+    bootCache = {
+      load,
+      resumeSavedAt: load.status === 'loaded' && !tabWasActive ? load.savedAt : null,
+    };
   }
   return bootCache;
 }
@@ -36,19 +55,34 @@ interface SessionContextValue {
   imagesReady: boolean;
   /** Set when the quote or a photo could not be saved because storage is full. */
   storageWarning: string | null;
+  /** ISO time of the saved quote being offered for resuming, or null when no notice should show. */
+  resumeSavedAt: string | null;
+  dismissResumeNotice: () => void;
+  /** Bumps on every new quote so the wizard can remount steps that hold local form state. */
+  quoteEpoch: number;
   setEntityFile: (id: string, file: File) => void;
   getEntityFiles: () => ReadonlyMap<string, File>;
   clearEntityFiles: () => void;
+  /** The single start-over action: wipes photos and resets the session (rates are kept). */
+  startNewQuote: () => void;
 }
 
 export const SessionContext = createContext<SessionContextValue | null>(null);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(sessionReducer, undefined, (): SessionState => boot().state);
+  const [state, dispatch] = useReducer(sessionReducer, undefined, (): SessionState => boot().load.state);
   const filesRef = useRef<Map<string, File>>(new Map());
   const [imagesReady, setImagesReady] = useState(false);
   const [stateQuotaHit, setStateQuotaHit] = useState(false);
   const [imageQuotaHit, setImageQuotaHit] = useState(false);
+  const [resumeSavedAt, setResumeSavedAt] = useState<string | null>(() => boot().resumeSavedAt);
+  const [quoteEpoch, setQuoteEpoch] = useState(0);
+
+  // From now on this tab counts as active, so reloading it does not offer the resume notice again.
+  useEffect(() => {
+    const storage = getSessionStorage();
+    if (storage) markTabActive(storage);
+  }, []);
 
   // Ask the browser not to evict our storage under pressure. Best effort only.
   useEffect(() => {
@@ -84,6 +118,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     filesRef.current.clear();
     clearImages().catch(() => {});
   }, []);
+
+  const dismissResumeNotice = useCallback(() => setResumeSavedAt(null), []);
+
+  const startNewQuote = useCallback(() => {
+    clearEntityFiles();
+    setStateQuotaHit(false);
+    setImageQuotaHit(false);
+    setResumeSavedAt(null);
+    setQuoteEpoch((n) => n + 1);
+    dispatch({ type: 'RESET_SESSION' });
+  }, [clearEntityFiles]);
 
   // Signature of the last content written (or loaded), so a rates-only change
   // never rewrites storage.
@@ -135,7 +180,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <SessionContext.Provider
-      value={{ state, dispatch, imagesReady, storageWarning, setEntityFile, getEntityFiles, clearEntityFiles }}
+      value={{
+        state,
+        dispatch,
+        imagesReady,
+        storageWarning,
+        resumeSavedAt,
+        dismissResumeNotice,
+        quoteEpoch,
+        setEntityFile,
+        getEntityFiles,
+        clearEntityFiles,
+        startNewQuote,
+      }}
     >
       {children}
     </SessionContext.Provider>

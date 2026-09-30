@@ -8,7 +8,7 @@ import { ProductStep } from './steps/ProductStep';
 import { ReviewStep } from './steps/ReviewStep';
 
 export function QuoteWizard() {
-  const { state } = useSession();
+  const { state, quoteEpoch } = useSession();
   const width = containerWidthClass(state.step);
 
   return (
@@ -25,8 +25,8 @@ export function QuoteWizard() {
       <main className={`mx-auto w-full px-4 pb-12 pt-6 ${width}`}>
         <SessionNotices />
 
-        {/* Keyed so the enter animation replays once per step change */}
-        <div key={state.step} className="animate-fade-in-up">
+        {/* Keyed so the enter animation replays once per step change, and a new quote starts every form blank */}
+        <div key={`${state.step}-${quoteEpoch}`} className="animate-fade-in-up">
           {state.step === 'supplier' && <SupplierStep />}
           {state.step === 'product' && <ProductStep />}
           {state.step === 'review' && <ReviewStep />}
