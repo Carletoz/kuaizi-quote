@@ -12,38 +12,15 @@ import { TextField } from '@/components/ui/TextField';
 import { fieldHintClass } from '@/components/ui/fieldStyles';
 import { calculateLandedCost } from '@/lib/calc/v3-landed';
 import { ALL_HS_CATEGORIES, getHSCategory } from '@/data/hs-categories';
-import type { DimensionsSource } from '@/state/session/types';
+import {
+  DEFAULT_PRODUCT_FORM,
+  PRODUCT_DRAFT_KEY,
+  sanitizeProductForm,
+  type PriceCurrency,
+  type ProductFormState,
+} from '@/state/session/drafts';
+import { useFormDraft } from '@/state/session/useFormDraft';
 import { FLETE_INTERNO_HELP, FLETE_INTERNO_LABEL } from '../copy';
-
-type PriceCurrency = 'RMB' | 'USD';
-
-interface ProductFormState {
-  name: string;
-  numCajas: number;
-  priceInputValue: number;
-  priceCurrency: PriceCurrency;
-  piezasPorCaja: number;
-  cbm: number;
-  dimensionsSource: DimensionsSource;
-  hsCategoryId: string;
-  arancelRate: number;
-  ivaRate: number;
-  fleteInternoChinaRmb: number;
-}
-
-const DEFAULT_FORM: ProductFormState = {
-  name: '',
-  numCajas: 1,
-  priceInputValue: 0,
-  priceCurrency: 'RMB',
-  piezasPorCaja: 1,
-  cbm: 0,
-  dimensionsSource: 'direct',
-  hsCategoryId: '',
-  arancelRate: 0,
-  ivaRate: 0.19,
-  fleteInternoChinaRmb: 0,
-};
 
 const CURRENCY_OPTIONS: Array<{ value: PriceCurrency; label: string }> = [
   { value: 'RMB', label: '¥ RMB' },
@@ -62,8 +39,8 @@ export function ProductStep() {
   const { state, dispatch, setEntityFile } = useSession();
   const scan = useProductScan();
 
-
-  const [form, setForm] = useState<ProductFormState>(DEFAULT_FORM);
+  // The form survives a closed tab; the scanned photo (a File) and scan status do not.
+  const [form, setForm, resetForm] = useFormDraft(PRODUCT_DRAFT_KEY, DEFAULT_PRODUCT_FORM, sanitizeProductForm);
   const [scannedFile, setScannedFile] = useState<File | undefined>();
   const set = <K extends keyof ProductFormState>(k: K) =>
     (v: ProductFormState[K]) =>
@@ -177,7 +154,7 @@ export function ProductStep() {
       },
     });
     dispatch({ type: 'SET_STEP', payload: 'review' });
-    setForm(DEFAULT_FORM);
+    resetForm();
     setScannedFile(undefined);
     scan.reset();
   };

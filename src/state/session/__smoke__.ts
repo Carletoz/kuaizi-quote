@@ -2,10 +2,24 @@
  * Smoke test for the session persistence layer.
  * Run via: npx tsx src/state/session/__smoke__.ts
  *
- * Exercises persistence.ts against an in-memory fake Storage (no browser).
+ * Exercises persistence.ts and drafts.ts against an in-memory fake Storage (no browser).
  * Prints PASS/FAIL per case and exits non-zero when any case fails.
  */
 
+import { ALL_HS_CATEGORIES } from '../../data/hs-categories';
+import {
+  DEFAULT_PRODUCT_FORM,
+  EMPTY_SUPPLIER_DRAFT,
+  PRODUCT_DRAFT_KEY,
+  SUPPLIER_DRAFT_KEY,
+  clearAllDrafts,
+  isPristine,
+  readDraft,
+  removeDraft,
+  sanitizeProductForm,
+  sanitizeSupplierDraft,
+  writeDraft,
+} from './drafts';
 import { initialSessionState } from './reducer';
 import {
   SESSION_STORAGE_KEY,
@@ -279,6 +293,114 @@ run('tab marker: absent on a new tab, present after marking, safe when storage t
 
   assert(wasTabActive(new FakeStorage({ getError: new Error('x') })), 'unreadable storage suppresses the notice');
   markTabActive(new FakeStorage({ setError: new Error('x') }));
+});
+
+// ---------------------------------------------------------------------------
+// Form drafts
+// ---------------------------------------------------------------------------
+
+run('product draft round trip restores the same form', () => {
+  const storage = new FakeStorage();
+  const form = { ...DEFAULT_PRODUCT_FORM, name: 'Taza', numCajas: 4, priceInputValue: 3.5, cbm: 0.05 };
+  assert(writeDraft(storage, PRODUCT_DRAFT_KEY, form), 'write succeeded');
+
+  const stored = JSON.parse(storage.data.get(PRODUCT_DRAFT_KEY) as string);
+  assertEqual(stored.version, 1, 'stored version');
+
+  assertEqual(readDraft(storage, PRODUCT_DRAFT_KEY, sanitizeProductForm), form, 'restored form');
+});
+
+run('a missing draft reads as null', () => {
+  assertEqual(readDraft(new FakeStorage(), PRODUCT_DRAFT_KEY, sanitizeProductForm), null, 'no draft');
+});
+
+run('draft with a wrong version or corrupt JSON is dropped', () => {
+  const wrongVersion = new FakeStorage();
+  wrongVersion.data.set(PRODUCT_DRAFT_KEY, JSON.stringify({ version: 9, savedAt: 'x', data: { name: 'old' } }));
+  assertEqual(readDraft(wrongVersion, PRODUCT_DRAFT_KEY, sanitizeProductForm), null, 'wrong version');
+  assert(!wrongVersion.data.has(PRODUCT_DRAFT_KEY), 'wrong version removed');
+
+  const corrupt = new FakeStorage();
+  corrupt.data.set(PRODUCT_DRAFT_KEY, '}{');
+  assertEqual(readDraft(corrupt, PRODUCT_DRAFT_KEY, sanitizeProductForm), null, 'corrupt');
+  assert(!corrupt.data.has(PRODUCT_DRAFT_KEY), 'corrupt removed');
+
+  const notAnObject = new FakeStorage();
+  notAnObject.data.set(PRODUCT_DRAFT_KEY, JSON.stringify({ version: 1, savedAt: 'x', data: 'text' }));
+  assertEqual(readDraft(notAnObject, PRODUCT_DRAFT_KEY, sanitizeProductForm), null, 'data not an object');
+});
+
+run('product form sanitizer picks known keys and falls back to defaults on bad types', () => {
+  const restored = sanitizeProductForm({
+    name: 42,
+    numCajas: 'many',
+    priceInputValue: -5,
+    priceCurrency: 'EUR',
+    piezasPorCaja: 0,
+    cbm: null,
+    dimensionsSource: 'guess',
+    hsCategoryId: 7,
+    fleteInternoChinaRmb: Number.NaN,
+    scannedFile: { fake: true },
+    somethingElse: 'ignored',
+  });
+  assertEqual(restored, DEFAULT_PRODUCT_FORM, 'all defaults');
+  assert(!('scannedFile' in restored) && !('somethingElse' in restored), 'unknown keys dropped');
+});
+
+run('product form sanitizer clamps counts and resolves the HS category', () => {
+  const category = ALL_HS_CATEGORIES[0];
+  assert(category !== undefined, 'fixture: at least one HS category');
+
+  const known = sanitizeProductForm({ hsCategoryId: category.id, numCajas: 2.6, piezasPorCaja: 12 });
+  assertEqual(known.hsCategoryId, category.id, 'known category kept');
+  assertEqual(known.arancelRate, category.arancelRate, 'arancel follows the category');
+  assertEqual(known.ivaRate, category.ivaRate, 'iva follows the category');
+  assertEqual(known.numCajas, 3, 'numCajas rounded');
+
+  const ghost = sanitizeProductForm({ hsCategoryId: 'removed-in-a-deploy', arancelRate: 0.4, ivaRate: 0.05 });
+  assertEqual(ghost.hsCategoryId, '', 'unknown category cleared');
+  assertEqual(ghost.arancelRate, 0, 'default arancel');
+  assertEqual(ghost.ivaRate, 0.19, 'default iva');
+});
+
+run('supplier draft round trip and sanitizer', () => {
+  const storage = new FakeStorage();
+  const draft = { name: 'Yiwu Co.', tel: 'wx123', location: 'Stand 4' };
+  writeDraft(storage, SUPPLIER_DRAFT_KEY, draft);
+  assertEqual(readDraft(storage, SUPPLIER_DRAFT_KEY, sanitizeSupplierDraft), draft, 'restored draft');
+
+  assertEqual(sanitizeSupplierDraft({ name: 1, tel: null, extra: 'x' }), EMPTY_SUPPLIER_DRAFT, 'bad types fall back');
+});
+
+run('pristine forms are recognised; edited ones are not', () => {
+  assert(isPristine({ ...DEFAULT_PRODUCT_FORM }, DEFAULT_PRODUCT_FORM), 'defaults are pristine');
+  assert(!isPristine({ ...DEFAULT_PRODUCT_FORM, name: 'x' }, DEFAULT_PRODUCT_FORM), 'edited product form');
+  assert(isPristine({ ...EMPTY_SUPPLIER_DRAFT }, EMPTY_SUPPLIER_DRAFT), 'empty supplier draft');
+  assert(!isPristine({ ...EMPTY_SUPPLIER_DRAFT, tel: '1' }, EMPTY_SUPPLIER_DRAFT), 'edited supplier draft');
+});
+
+run('clearAllDrafts removes both drafts and leaves the session alone', () => {
+  const storage = new FakeStorage();
+  saveSession(storage, filled);
+  writeDraft(storage, PRODUCT_DRAFT_KEY, DEFAULT_PRODUCT_FORM);
+  writeDraft(storage, SUPPLIER_DRAFT_KEY, EMPTY_SUPPLIER_DRAFT);
+
+  clearAllDrafts(storage);
+  assert(!storage.data.has(PRODUCT_DRAFT_KEY) && !storage.data.has(SUPPLIER_DRAFT_KEY), 'drafts removed');
+  assert(storage.data.has(SESSION_STORAGE_KEY), 'session untouched');
+});
+
+run('draft storage that throws never throws', () => {
+  const broken = new FakeStorage({
+    getError: new Error('x'),
+    setError: quotaError(),
+    removeError: new Error('x'),
+  });
+  assertEqual(writeDraft(broken, PRODUCT_DRAFT_KEY, DEFAULT_PRODUCT_FORM), false, 'write reports failure');
+  assertEqual(readDraft(broken, PRODUCT_DRAFT_KEY, sanitizeProductForm), null, 'read reports nothing');
+  removeDraft(broken, PRODUCT_DRAFT_KEY);
+  clearAllDrafts(broken);
 });
 
 // ---------------------------------------------------------------------------

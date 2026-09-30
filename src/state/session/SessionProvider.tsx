@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useReducer, u
 import { sessionReducer, initialSessionState } from './reducer';
 import type { SessionState, SessionAction } from './types';
 import { saveImage, loadAllImages, clearImages } from '@/lib/imageDb';
+import { clearAllDrafts } from './drafts';
 import {
   contentSignature,
   getLocalStorage,
@@ -123,6 +124,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const startNewQuote = useCallback(() => {
     clearEntityFiles();
+    const storage = getLocalStorage();
+    if (storage) clearAllDrafts(storage);
     setStateQuotaHit(false);
     setImageQuotaHit(false);
     setResumeSavedAt(null);
