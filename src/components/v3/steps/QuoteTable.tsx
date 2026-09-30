@@ -1,4 +1,5 @@
 import { useState, Fragment } from 'react';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { ProductEntry } from '@/state/session/types';
 import { Alert } from '@/components/ui/Alert';
 import { Button, buttonClasses } from '@/components/ui/Button';
@@ -10,6 +11,7 @@ import { GroupTh, Td, Th } from '../quote/cells';
 import { draftToFields, seedDraft } from '../quote/editDraft';
 import type { EditDraft } from '../quote/editDraft';
 import { fmtCOP } from '../quote/format';
+import { QuoteList } from '../quote/QuoteList';
 import { RatesCard } from '../quote/RatesCard';
 import { RowDetail } from '../quote/RowDetail';
 import { buildOrderTotals, buildRowModel } from '../quote/rowModel';
@@ -58,6 +60,8 @@ export function QuoteTable({
   const [draft, setDraft] = useState<EditDraft | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmingNew, setConfirmingNew] = useState(false);
+  // Tailwind's `md` breakpoint. Falls back to the table where matchMedia is unavailable.
+  const isWide = useMediaQuery('(min-width: 768px)', true);
 
   // Starting over wipes the session, so ask first unless the quote is empty or already shared.
   const newQuoteNeedsConfirm = products.length > 0 && shareStatus !== 'success';
@@ -101,7 +105,8 @@ export function QuoteTable({
   const rows = products.map((p) =>
     buildRowModel(p, editingId === p.id ? draft : null, rates, sellingPrices[p.id] ?? '')
   );
-  const { grandTotalCop, grandTotalCajas, grandTotalFleteCop, orderTotalCbm } = buildOrderTotals(products, rates);
+  const totals = buildOrderTotals(products, rates);
+  const { grandTotalCop, grandTotalCajas, grandTotalFleteCop, orderTotalCbm } = totals;
 
   return (
     <div className="flex flex-col gap-4">
@@ -112,8 +117,27 @@ export function QuoteTable({
         ratesUsedFallback={ratesUsedFallback}
       />
 
+      {/* Phones: one product per row. Only one of the two layouts is ever mounted. */}
+      {products.length > 0 && !isWide && (
+        <QuoteList
+          rows={rows}
+          totals={totals}
+          expandedId={expandedId}
+          onToggleExpanded={(id) => setExpandedId(expandedId === id ? null : id)}
+          entityFiles={entityFiles}
+          draft={draft}
+          saveError={saveError}
+          onDraftChange={(patch) => setDraft((d) => (d ? { ...d, ...patch } : d))}
+          onStartEdit={startEdit}
+          onSave={handleSave}
+          onCancel={handleCancel}
+          onSellingPriceChange={(id, value) => setSellingPrices((prev) => ({ ...prev, [id]: value }))}
+          onRemove={onRemove}
+        />
+      )}
+
       {/* Table */}
-      {products.length > 0 && (
+      {products.length > 0 && isWide && (
         <div
           role="region"
           aria-label="Cotización por producto"
