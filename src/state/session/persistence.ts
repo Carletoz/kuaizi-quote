@@ -163,7 +163,8 @@ function toProduct(v: unknown): ProductEntry | null {
   // throwing away the whole quote over one cleared cell.
   return {
     ...(v as unknown as ProductEntry),
-    piezasPorCaja: isFiniteNumber(v.piezasPorCaja) ? v.piezasPorCaja : 0,
+    // 0 would divide by zero in the landed-cost math; a missing value means one piece per box.
+    piezasPorCaja: isFiniteNumber(v.piezasPorCaja) && v.piezasPorCaja > 0 ? v.piezasPorCaja : 1,
     cbm: isFiniteNumber(v.cbm) ? v.cbm : 0,
   };
 }

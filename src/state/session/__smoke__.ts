@@ -229,14 +229,17 @@ run('nothing saved loads as empty', () => {
   assertEqual(loaded.savedAt, null, 'savedAt');
 });
 
-run('a product with a cleared piezas/cbm cell still loads', () => {
-  // The quote table can leave these undefined; JSON then drops the keys.
+run('a product with a cleared piezas/cbm cell loads with safe values', () => {
+  // Older builds of the quote table could leave these undefined; JSON then drops the keys.
   const { piezasPorCaja: _p, cbm: _c, ...partial } = product;
   const storage = withRaw(envelope({ state: { ...filled, products: [partial] } }));
   const loaded = loadSession(storage);
   assertEqual(loaded.status, 'loaded', 'status');
-  assertEqual(loaded.state.products[0].piezasPorCaja, 0, 'piezasPorCaja coerced');
+  assertEqual(loaded.state.products[0].piezasPorCaja, 1, 'missing piezasPorCaja becomes 1, never 0');
   assertEqual(loaded.state.products[0].cbm, 0, 'cbm coerced');
+
+  const zero = loadSession(withRaw(envelope({ state: { ...filled, products: [{ ...product, piezasPorCaja: 0 }] } })));
+  assertEqual(zero.state.products[0].piezasPorCaja, 1, 'explicit 0 piezasPorCaja becomes 1');
 });
 
 run('storage that throws on write does not throw', () => {

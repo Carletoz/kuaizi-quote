@@ -10,7 +10,7 @@
 import { calculateLandedCost } from '../../../lib/calc/v3-landed';
 import { ALL_HS_CATEGORIES } from '../../../data/hs-categories';
 import type { ProductEntry } from '../../../state/session/types';
-import { seedDraft } from './editDraft';
+import { draftToFields, seedDraft } from './editDraft';
 import type { EditDraft } from './editDraft';
 import { buildOrderTotals, buildRowModel } from './rowModel';
 
@@ -210,6 +210,28 @@ function case6(): void {
   check('totals still use saved products', buildOrderTotals([a], rates).grandTotalCop, ca.precioTotalFinalCop);
 }
 
+function case7(): void {
+  console.log('\nCase 7: the edit form never saves the blanks that used to price a row as NaN');
+  const p = product();
+  const seeded = seedDraft(p);
+
+  checkTrue('a valid draft saves', draftToFields(seeded) !== null);
+  check('blank piezas por caja is rejected', draftToFields({ ...seeded, piezasPorCaja: '' }), null);
+  check('zero piezas por caja is rejected', draftToFields({ ...seeded, piezasPorCaja: '0' }), null);
+  check('non-numeric piezas por caja is rejected', draftToFields({ ...seeded, piezasPorCaja: 'abc' }), null);
+
+  const blankCbm = draftToFields({ ...seeded, cbm: '' });
+  check('blank CBM saves as 0', blankCbm?.cbm, 0);
+  check('blank CBM keeps piezas por caja', blankCbm?.piezasPorCaja, 10);
+  check('quantity is cajas times piezas por caja', blankCbm?.quantity, 10 * 10);
+
+  // A legacy product without these fields must seed a usable draft, not the string "undefined".
+  const legacy = product({ piezasPorCaja: undefined as unknown as number, cbm: undefined as unknown as number });
+  const legacySeed = seedDraft(legacy);
+  check('legacy seed piezas por caja is 1', legacySeed.piezasPorCaja, '1');
+  check('legacy seed CBM is 0', legacySeed.cbm, '0');
+}
+
 console.log('=== Quote row model — smoke tests ===');
 case1();
 case2();
@@ -217,6 +239,7 @@ case3();
 case4();
 case5();
 case6();
+case7();
 
 if (failures > 0) {
   console.error(`\nFAIL: ${failures} check(s) failed.`);

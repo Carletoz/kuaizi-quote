@@ -86,7 +86,7 @@ export function QuoteTable({
     if (!draft) return;
     const fields = draftToFields(draft);
     if (!fields) {
-      setSaveError('Nombre, # cajas y precio son requeridos.');
+      setSaveError('Nombre, # cajas, piezas por caja y precio son requeridos.');
       return;
     }
     onUpdate(id, fields);

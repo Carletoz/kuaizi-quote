@@ -33,8 +33,9 @@ export function seedDraft(p: ProductEntry): EditDraft {
     name: p.name,
     numCajas: String(numCajas),
     unitPriceRmb: String(p.unitPriceRmb),
-    piezasPorCaja: String(p.piezasPorCaja),
-    cbm: String(p.cbm),
+    // Products saved before the edit form was fixed may lack these; seed usable values instead of "undefined".
+    piezasPorCaja: String(p.piezasPorCaja > 0 ? p.piezasPorCaja : 1),
+    cbm: String(Number.isFinite(p.cbm) ? p.cbm : 0),
     hsCategoryId: matchedCat ? matchedCat.id : CUSTOM_HS,
     arancelRate: String(arancelPct),
     ivaRate: String(ivaPct),
@@ -50,9 +51,11 @@ export function draftToFields(d: EditDraft): Partial<ProductEntry> | null {
 
   if (!d.name.trim()) return null;
   if (!numCajas || numCajas <= 0) return null;
-  if (!unitPriceRmb || unitPriceRmb <= 0) return null;
+  if (!unitPriceRmb || unitPriceRmb <= 0 || !Number.isFinite(unitPriceRmb)) return null;
+  // Pieces per box drives the quantity and the per-box split; blank or zero would price the row as NaN or Infinity.
+  if (!Number.isFinite(piezasPorCaja) || piezasPorCaja <= 0) return null;
 
-  const quantity = piezasPorCaja > 0 ? numCajas * piezasPorCaja : numCajas;
+  const quantity = numCajas * piezasPorCaja;
   const arancelPct = Math.min(100, Math.max(0, parseFloat(d.arancelRate) || 0));
   const ivaPct = Math.min(100, Math.max(0, parseFloat(d.ivaRate) || 0));
   const cbm = parseFloat(d.cbm);
@@ -62,8 +65,9 @@ export function draftToFields(d: EditDraft): Partial<ProductEntry> | null {
     name: d.name.trim(),
     quantity,
     unitPriceRmb,
-    piezasPorCaja: piezasPorCaja > 0 ? piezasPorCaja : undefined,
-    cbm: cbm > 0 ? cbm : undefined,
+    piezasPorCaja,
+    // CBM is optional: blank means 0, the same as in the product form.
+    cbm: Number.isFinite(cbm) && cbm > 0 ? cbm : 0,
     arancelRate: arancelPct / 100,
     ivaRate: ivaPct / 100,
     fleteInternoChinaRmb,
