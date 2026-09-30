@@ -5,29 +5,41 @@ import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { ScanDropzone } from '@/components/ui/ScanDropzone';
 import { TextField } from '@/components/ui/TextField';
+import {
+  EMPTY_SUPPLIER_DRAFT,
+  SUPPLIER_DRAFT_KEY,
+  sanitizeSupplierDraft,
+  type SupplierDraft,
+} from '@/state/session/drafts';
+import { useFormDraft } from '@/state/session/useFormDraft';
 
 export function SupplierStep() {
   const { dispatch, setEntityFile } = useSession();
   const scan = useSupplierScan();
   const [scannedFile, setScannedFile] = useState<File | undefined>();
 
-  const [name, setName] = useState('');
-  const [tel, setTel] = useState('');
-  const [location, setLocation] = useState('');
+  // The typed fields survive a closed tab; the scanned photo (a File) and scan status do not.
+  const [draft, setDraft, resetDraft] = useFormDraft(SUPPLIER_DRAFT_KEY, EMPTY_SUPPLIER_DRAFT, sanitizeSupplierDraft);
+  const { name, tel, location } = draft;
+  const setField = (field: keyof SupplierDraft, value: string) =>
+    setDraft((prev) => ({ ...prev, [field]: value }));
 
   const handleFile = (file: File) => {
     setScannedFile(file);
     scan.trigger(file);
   };
 
+  // A scan only fills fields the user has not typed into.
   useEffect(() => {
     if (scan.status === 'success' && scan.result) {
       const r = scan.result;
-      if (r.name) setName((prev) => prev === '' ? r.name : prev);
-      if (r.tel) setTel((prev) => prev === '' ? r.tel! : prev);
-      if (r.location) setLocation((prev) => prev === '' ? r.location! : prev);
+      setDraft((prev) => ({
+        name: prev.name === '' && r.name ? r.name : prev.name,
+        tel: prev.tel === '' && r.tel ? r.tel : prev.tel,
+        location: prev.location === '' && r.location ? r.location : prev.location,
+      }));
     }
-  }, [scan.status, scan.result]);
+  }, [scan.status, scan.result, setDraft]);
 
   const canConfirm = name.trim().length > 0;
 
@@ -47,6 +59,7 @@ export function SupplierStep() {
       },
     });
     dispatch({ type: 'SET_STEP', payload: 'product' });
+    resetDraft();
   };
 
   return (
@@ -89,21 +102,21 @@ export function SupplierStep() {
           label="Nombre del proveedor"
           required
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => setField('name', e.target.value)}
           placeholder="Ej: Guangzhou Textiles Co."
           autoComplete="off"
         />
         <TextField
           label="Telefono / WeChat"
           value={tel}
-          onChange={(e) => setTel(e.target.value)}
+          onChange={(e) => setField('tel', e.target.value)}
           placeholder="Opcional"
           autoComplete="off"
         />
         <TextField
           label="Ubicacion / Stand"
           value={location}
-          onChange={(e) => setLocation(e.target.value)}
+          onChange={(e) => setField('location', e.target.value)}
           placeholder="Opcional"
           autoComplete="off"
         />

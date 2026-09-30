@@ -2,12 +2,13 @@ import { useSession } from '@/state/session/SessionProvider';
 import { AppHeader } from '@/components/App/AppHeader';
 import { Stepper } from '@/components/App/Stepper';
 import { containerWidthClass } from '@/lib/layout';
+import { SessionNotices } from './SessionNotices';
 import { SupplierStep } from './steps/SupplierStep';
 import { ProductStep } from './steps/ProductStep';
 import { ReviewStep } from './steps/ReviewStep';
 
 export function QuoteWizard() {
-  const { state } = useSession();
+  const { state, quoteEpoch } = useSession();
   const width = containerWidthClass(state.step);
 
   return (
@@ -22,8 +23,10 @@ export function QuoteWizard() {
       </div>
 
       <main className={`mx-auto w-full px-4 pb-12 pt-6 ${width}`}>
-        {/* Keyed so the enter animation replays once per step change */}
-        <div key={state.step} className="animate-fade-in-up">
+        <SessionNotices />
+
+        {/* Keyed so the enter animation replays once per step change, and a new quote starts every form blank */}
+        <div key={`${state.step}-${quoteEpoch}`} className="animate-fade-in-up">
           {state.step === 'supplier' && <SupplierStep />}
           {state.step === 'product' && <ProductStep />}
           {state.step === 'review' && <ReviewStep />}

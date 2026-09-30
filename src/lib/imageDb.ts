@@ -32,6 +32,14 @@ export async function loadAllImages(): Promise<Map<string, File>> {
   return map;
 }
 
+/** Removes the given photos in one transaction; ids that are not stored are ignored. */
+export async function deleteImages(ids: readonly string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const db = await getDb();
+  const tx = db.transaction(STORE, 'readwrite');
+  await Promise.all([...ids.map((id) => tx.store.delete(id)), tx.done]);
+}
+
 export async function clearImages(): Promise<void> {
   const db = await getDb();
   await db.clear(STORE);
