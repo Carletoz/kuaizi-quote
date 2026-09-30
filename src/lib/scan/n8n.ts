@@ -88,7 +88,7 @@ export interface QuoteShareData {
   trmCopUsd: number;
   cnyToUsd: number;
   grandTotal: number;
-  suppliers: Array<{ id: string; name: string; tel?: string; location?: string; bitrixId?: number }>;
+  suppliers: Array<{ id: string; name: string; tel?: string; location?: string; raw?: string; bitrixId?: number }>;
   products: QuoteProductItem[];
   images?: QuoteImage[];
 }

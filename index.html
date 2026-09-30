@@ -5,6 +5,18 @@
     <link rel="icon" type="image/svg+xml" href="/src/assets/kuaizi-logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Calculadora de Importación — Kuaizi Group</title>
+    <!-- Apply the saved/system theme before paint to avoid a flash of the wrong theme -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('kuaizi-theme');
+          if (t !== 'light' && t !== 'dark') {
+            t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          if (t === 'dark') document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -12,7 +24,7 @@
       rel="stylesheet"
     />
   </head>
-  <body class="bg-kuaizi-paper font-sans">
+  <body class="bg-bg font-sans">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId, type ReactNode } from 'react';
+import { fieldLabelClass } from './fieldStyles';
 
 interface NumberFieldProps {
   label: string;
@@ -13,6 +14,10 @@ interface NumberFieldProps {
   className?: string;
   hint?: string;
   readOnly?: boolean;
+  /** Accessible name for fields whose visible label is rendered by the parent. */
+  ariaLabel?: string;
+  /** Control shown at the right end of the label row, e.g. a currency switch. */
+  labelAccessory?: ReactNode;
 }
 
 export function NumberField({
@@ -28,7 +33,10 @@ export function NumberField({
   className = '',
   hint,
   readOnly = false,
+  ariaLabel,
+  labelAccessory,
 }: NumberFieldProps) {
+  const inputId = useId();
   const [text, setText] = useState(value === 0 ? '' : String(value));
 
   // Sync display when parent resets value externally (e.g. DEFAULT_INPUTS)
@@ -49,41 +57,42 @@ export function NumberField({
     onChange(isNaN(parsed) ? 0 : parsed);
   };
 
+  const addonClass =
+    'flex items-center whitespace-nowrap bg-surface-raised px-3 text-sm text-content-muted';
+
   return (
-    <div className={`flex flex-col gap-1 min-w-0 ${className}`}>
-      <label className="text-sm font-medium text-kuaizi-ink">
-        {label}
-        {hint && (
-          <span className="ml-1 text-xs font-normal text-gray-500" title={hint}>
-            {' '}({hint})
-          </span>
-        )}
-      </label>
-      <div className="flex items-center min-w-0 rounded-md border border-gray-300 bg-white focus-within:border-kuaizi-accent focus-within:ring-1 focus-within:ring-kuaizi-accent">
-        {prefix && (
-          <span className="px-2 text-sm text-gray-500 border-r border-gray-300 bg-gray-50 rounded-l-md py-2">
-            {prefix}
-          </span>
-        )}
+    <div className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
+      {(label || hint || labelAccessory) && (
+        <div className="flex items-center justify-between gap-2">
+          {(label || hint) && (
+            <label htmlFor={inputId} className={fieldLabelClass}>
+              {label}
+              {hint && (
+                <span className="ml-1 text-xs font-normal text-content-subtle" title={hint}>
+                  {' '}({hint})
+                </span>
+              )}
+            </label>
+          )}
+          {labelAccessory}
+        </div>
+      )}
+      <div className="flex min-h-[44px] min-w-0 items-stretch overflow-hidden rounded-xl border border-border-strong bg-surface transition-colors focus-within:border-accent focus-within:ring-1 focus-within:ring-accent">
+        {prefix && <span className={`${addonClass} border-r border-border-strong`}>{prefix}</span>}
         <input
+          id={inputId}
           type="text"
           inputMode="decimal"
           value={text}
           onChange={handleChange}
           placeholder={placeholder}
           readOnly={readOnly}
-          className={`
-            flex-1 px-3 py-2 text-sm text-kuaizi-ink bg-transparent outline-none
-            ${readOnly ? 'bg-gray-50 text-gray-600 cursor-default' : ''}
-            ${!prefix ? 'rounded-l-md' : ''}
-            ${!suffix ? 'rounded-r-md' : ''}
-          `}
+          aria-label={label ? undefined : ariaLabel}
+          className={`min-w-0 flex-1 px-3 py-2 text-base outline-none placeholder:text-content-subtle sm:text-sm ${
+            readOnly ? 'cursor-default bg-surface-raised text-content-muted' : 'bg-transparent text-content'
+          }`}
         />
-        {suffix && (
-          <span className="px-2 text-sm text-gray-500 border-l border-gray-300 bg-gray-50 rounded-r-md py-2">
-            {suffix}
-          </span>
-        )}
+        {suffix && <span className={`${addonClass} border-l border-border-strong`}>{suffix}</span>}
       </div>
     </div>
   );

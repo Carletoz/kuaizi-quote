@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useProductScan } from '@/hooks/useScan';
 import { useSession } from '@/state/session/SessionProvider';
+import { Alert } from '@/components/ui/Alert';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { NumberField } from '@/components/ui/NumberField';
+import { ScanDropzone } from '@/components/ui/ScanDropzone';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { SelectField } from '@/components/ui/SelectField';
+import { TextField } from '@/components/ui/TextField';
 import { calculateLandedCost } from '@/lib/calc/v3-landed';
 import { ALL_HS_CATEGORIES, getHSCategory } from '@/data/hs-categories';
 import type { DimensionsSource } from '@/state/session/types';
@@ -35,6 +42,19 @@ const DEFAULT_FORM: ProductFormState = {
   ivaRate: 0.19,
   fleteInternoChinaRmb: 0,
 };
+
+const CURRENCY_OPTIONS: Array<{ value: PriceCurrency; label: string }> = [
+  { value: 'RMB', label: '¥ RMB' },
+  { value: 'USD', label: '$ USD' },
+];
+
+const HS_OPTIONS = [
+  { value: '', label: 'Sin categoría — IVA 19%, arancel 0%' },
+  ...ALL_HS_CATEGORIES.map((cat) => ({
+    value: cat.id,
+    label: `${cat.label} — arancel ${Math.round(cat.arancelRate * 100)}%`,
+  })),
+];
 
 export function ProductStep() {
   const { state, dispatch, setEntityFile } = useSession();
@@ -91,12 +111,9 @@ export function ProductStep() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scan.status, scan.result]);
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFile = (file: File) => {
     setScannedFile(file);
     scan.trigger(file);
-    e.target.value = '';
   };
 
   const activeSupplier =
@@ -167,76 +184,83 @@ export function ProductStep() {
     form.dimensionsSource === 'direct' ? 'CBM directo (del tag)' : 'CBM calculado (dimensiones)';
 
   return (
-    <div className="space-y-5 p-4">
-      {/* Active supplier badge */}
+    <section className="flex flex-col gap-6">
       {activeSupplier && (
-        <div className="rounded-xl bg-kuaizi-secondary/10 border border-kuaizi-secondary/20 px-4 py-2">
-          <p className="text-xs font-semibold text-kuaizi-secondary uppercase tracking-wide">
-            Proveedor activo
-          </p>
-          <p className="text-sm font-bold text-kuaizi-ink">{activeSupplier.name}</p>
+        <div className="rounded-xl border border-border bg-surface px-4 py-3 shadow-card">
+          <Badge tone="brand">Proveedor activo</Badge>
+          <p className="mt-1.5 break-words text-sm font-bold text-heading">{activeSupplier.name}</p>
         </div>
       )}
 
       <div>
-        <h2 className="text-lg font-bold text-kuaizi-ink">Escanear producto</h2>
-        <p className="text-sm text-gray-400 mt-0.5">
+        <h2 className="text-xl font-bold text-heading">Escanear producto</h2>
+        <p className="mt-1 text-sm text-content-subtle">
           Foto la etiqueta de precio o ingresa los datos manualmente.
         </p>
       </div>
 
-      {/* Scan trigger */}
-      <label
-        className={`w-full rounded-xl border-2 border-dashed border-kuaizi-secondary/40 bg-kuaizi-secondary/5 py-6 text-sm font-semibold text-kuaizi-secondary hover:bg-kuaizi-secondary/10 transition-colors flex items-center justify-center cursor-pointer ${scan.status === 'scanning' ? 'opacity-50 pointer-events-none' : ''}`}
-      >
-        <input
-          type="file"
-          accept="image/*"
-          className="sr-only"
-          disabled={scan.status === 'scanning'}
-          onChange={handleFile}
-        />
-        {scan.status === 'scanning' ? (
-          <span className="flex items-center justify-center gap-2">
-            <span className="animate-spin inline-block w-4 h-4 border-2 border-kuaizi-secondary border-t-transparent rounded-full" />
-            Analizando...
-          </span>
-        ) : (
-          'Escanear etiqueta de precio'
-        )}
-      </label>
+      <ScanDropzone
+        label="Escanear etiqueta de precio"
+        scanning={scan.status === 'scanning'}
+        onFile={handleFile}
+      />
 
-      {/* Error state */}
       {scan.status === 'error' && (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-3 flex items-center justify-between gap-3">
-          <p className="text-sm text-red-600">{scan.error ?? 'Error al escanear'}</p>
-          <button
-            type="button"
-            onClick={scan.reset}
-            className="text-xs font-semibold text-red-600 underline shrink-0"
-          >
-            Reintentar
-          </button>
-        </div>
+        <Alert
+          kind="danger"
+          action={
+            <Button variant="outline" onClick={scan.reset}>
+              Reintentar
+            </Button>
+          }
+        >
+          {scan.error ?? 'Error al escanear'}
+        </Alert>
       )}
 
       {/* Product form */}
-      <div className="space-y-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-kuaizi-ink">
-            Nombre del producto <span className="text-red-400">*</span>
-          </label>
-          <input
-            type="text"
-            value={form.name}
-            onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-            placeholder="Ej: Camiseta talla M azul"
-            className="rounded-md border border-gray-300 bg-white text-sm text-kuaizi-ink px-3 py-2 focus:outline-none focus:border-kuaizi-accent focus:ring-1 focus:ring-kuaizi-accent"
+      <div className="flex flex-col gap-4">
+        <TextField
+          label="Nombre del producto"
+          required
+          value={form.name}
+          onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+          placeholder="Ej: Camiseta talla M azul"
+          autoComplete="off"
+        />
+
+        <div className="flex flex-col gap-1.5">
+          <NumberField
+            label="Precio / u"
+            labelAccessory={
+              <SegmentedControl
+                size="sm"
+                ariaLabel="Moneda del precio"
+                options={CURRENCY_OPTIONS}
+                value={form.priceCurrency}
+                onChange={handleCurrencyToggle}
+              />
+            }
+            value={form.priceInputValue}
+            onChange={set('priceInputValue')}
+            prefix={form.priceCurrency === 'RMB' ? '¥' : '$'}
+            step={0.01}
+            min={0}
           />
+          {form.priceCurrency === 'USD' && unitPriceRmb > 0 && (
+            <p className="text-xs text-content-subtle">
+              ≈ ¥{unitPriceRmb.toFixed(2)} RMB
+            </p>
+          )}
+          {form.priceCurrency === 'RMB' && form.priceInputValue > 0 && state.cnyToUsd > 0 && (
+            <p className="text-xs text-content-subtle">
+              ≈ ${(form.priceInputValue * state.cnyToUsd).toFixed(2)} USD
+            </p>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
             <NumberField
               label="# Cajas"
               value={form.numCajas}
@@ -246,54 +270,9 @@ export function ProductStep() {
               min={1}
             />
             {form.numCajas > 0 && form.piezasPorCaja > 0 && (
-              <p className="text-xs text-gray-400">= {quantity} uds totales</p>
+              <p className="text-xs text-content-subtle">= {quantity} uds totales</p>
             )}
           </div>
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-kuaizi-ink">
-                Precio / u
-              </label>
-              <div className="flex rounded-md border border-gray-300 overflow-hidden text-xs font-semibold">
-                {(['RMB', 'USD'] as PriceCurrency[]).map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => handleCurrencyToggle(c)}
-                    className={`px-2 py-0.5 transition-colors ${
-                      form.priceCurrency === c
-                        ? 'bg-kuaizi-secondary text-white'
-                        : 'bg-white text-gray-500 hover:bg-gray-50'
-                    }`}
-                  >
-                    {c === 'RMB' ? '¥' : '$'} {c}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <NumberField
-              label=""
-              value={form.priceInputValue}
-              onChange={set('priceInputValue')}
-              prefix={form.priceCurrency === 'RMB' ? '¥' : '$'}
-              hint={form.priceCurrency === 'RMB' ? 'CNY' : 'USD'}
-              step={0.01}
-              min={0}
-            />
-            {form.priceCurrency === 'USD' && unitPriceRmb > 0 && (
-              <p className="text-xs text-gray-400">
-                ≈ ¥{unitPriceRmb.toFixed(2)} RMB
-              </p>
-            )}
-            {form.priceCurrency === 'RMB' && form.priceInputValue > 0 && state.cnyToUsd > 0 && (
-              <p className="text-xs text-gray-400">
-                ≈ ${(form.priceInputValue * state.cnyToUsd).toFixed(2)} USD
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
           <NumberField
             label="Piezas / caja"
             value={form.piezasPorCaja}
@@ -302,7 +281,10 @@ export function ProductStep() {
             step={1}
             min={1}
           />
-          <div className="flex flex-col gap-1">
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
             <NumberField
               label="CBM / caja"
               value={form.cbm}
@@ -312,70 +294,53 @@ export function ProductStep() {
               min={0}
             />
             {scan.status === 'success' && (
-              <p className="text-xs text-kuaizi-secondary/70">{dimensionsLabel}</p>
+              <p className="text-xs text-content-subtle">{dimensionsLabel}</p>
             )}
           </div>
+          <NumberField
+            label="Flete Interno China (¥)"
+            value={form.fleteInternoChinaRmb}
+            onChange={set('fleteInternoChinaRmb')}
+            prefix="¥"
+            hint="RMB"
+            step={0.01}
+            min={0}
+          />
         </div>
 
-        <NumberField
-          label="Flete Interno China (¥)"
-          value={form.fleteInternoChinaRmb}
-          onChange={set('fleteInternoChinaRmb')}
-          prefix="¥"
-          hint="RMB"
-          step={0.01}
-          min={0}
-        />
-      </div>
-
-      {/* HS Category selector */}
-      <div className="flex flex-col gap-1">
-        <label className="text-sm font-medium text-kuaizi-ink">
-          Categoría HS (aranceles)
-        </label>
-        <select
+        {/* HS Category selector */}
+        <SelectField
+          label="Categoría HS (aranceles)"
           value={form.hsCategoryId}
-          onChange={(e) => handleHsChange(e.target.value)}
-          className="rounded-md border border-gray-300 bg-white text-sm text-kuaizi-ink px-3 py-2 focus:outline-none focus:border-kuaizi-accent focus:ring-1 focus:ring-kuaizi-accent"
-        >
-          <option value="">Sin categoría — IVA 19%, arancel 0%</option>
-          {ALL_HS_CATEGORIES.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.label} — arancel {Math.round(cat.arancelRate * 100)}%
-            </option>
-          ))}
-        </select>
+          options={HS_OPTIONS}
+          onChange={handleHsChange}
+        />
       </div>
 
       {/* Live cost preview */}
       {preview && (
-        <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 space-y-1">
-          <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">
-            Vista previa del costo
-          </p>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Precio / u final</span>
-            <span className="font-semibold text-emerald-700">
-              {Math.round(preview.precioUnidadFinalCop).toLocaleString('es-CO')} COP
-            </span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Total ({quantity} uds)</span>
-            <span className="font-bold text-emerald-700">
-              {Math.round(preview.precioTotalFinalCop).toLocaleString('es-CO')} COP
-            </span>
-          </div>
+        <div className="rounded-xl border border-primary/30 bg-primary-soft p-4">
+          <p className="text-sm font-semibold text-heading">Vista previa del costo</p>
+          <dl className="mt-2 space-y-1 text-sm">
+            <div className="flex justify-between gap-3">
+              <dt className="text-content-muted">Precio / u final</dt>
+              <dd className="font-semibold tabular-nums text-heading">
+                {Math.round(preview.precioUnidadFinalCop).toLocaleString('es-CO')} COP
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-content-muted">Total ({quantity} uds)</dt>
+              <dd className="font-bold tabular-nums text-heading">
+                {Math.round(preview.precioTotalFinalCop).toLocaleString('es-CO')} COP
+              </dd>
+            </div>
+          </dl>
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={handleConfirm}
-        disabled={!canConfirm}
-        className="w-full rounded-xl bg-kuaizi-secondary text-white py-3 text-sm font-semibold hover:bg-kuaizi-secondary/90 transition-colors disabled:opacity-40"
-      >
+      <Button fullWidth size="lg" onClick={handleConfirm} disabled={!canConfirm}>
         Agregar producto
-      </button>
-    </div>
+      </Button>
+    </section>
   );
 }
