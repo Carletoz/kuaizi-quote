@@ -1,88 +1,70 @@
 [
   {
-    "id": "textiles",
-    "label": "Textiles y confecciones",
-    "arancelRate": 0.20,
+    "id": "apparel-accessories",
+    "label": "Ropa y Accesorios",
+    "arancelRate": 0.40,
     "ivaRate": 0.19,
     "antidumpingRisk": true,
     "invimaRequired": false,
     "exampleHSCodes": ["6109.10.00.00", "6204.62.00.00"]
   },
   {
-    "id": "footwear",
-    "label": "Calzado",
-    "arancelRate": 0.20,
-    "ivaRate": 0.19,
-    "antidumpingRisk": true,
-    "invimaRequired": false,
-    "exampleHSCodes": ["6403.99.00.00"]
-  },
-  {
-    "id": "ceramics",
-    "label": "Cerámica y porcelana",
-    "arancelRate": 0.15,
-    "ivaRate": 0.19,
-    "antidumpingRisk": true,
-    "invimaRequired": false,
-    "exampleHSCodes": ["6911.10.00.00"]
-  },
-  {
     "id": "electronics",
-    "label": "Electrónicos y accesorios",
-    "arancelRate": 0.00,
+    "label": "Electrónicos",
+    "arancelRate": 0.05,
     "ivaRate": 0.19,
     "antidumpingRisk": false,
     "invimaRequired": false,
     "exampleHSCodes": ["8517.13.00.00", "8528.72.00.00"]
   },
   {
-    "id": "toys",
-    "label": "Juguetes y artículos de juego",
-    "arancelRate": 0.10,
-    "ivaRate": 0.19,
-    "antidumpingRisk": false,
-    "invimaRequired": false,
-    "exampleHSCodes": ["9503.00.22.00"]
-  },
-  {
-    "id": "furniture",
-    "label": "Muebles y accesorios del hogar",
+    "id": "sports-entertainment",
+    "label": "Deportes y Entretenimiento",
     "arancelRate": 0.15,
     "ivaRate": 0.19,
     "antidumpingRisk": false,
     "invimaRequired": false,
-    "exampleHSCodes": ["9403.60.00.00"]
+    "exampleHSCodes": ["9506.62.00.00"]
   },
   {
-    "id": "machinery",
-    "label": "Maquinaria y equipos industriales",
-    "arancelRate": 0.05,
-    "ivaRate": 0.19,
-    "antidumpingRisk": false,
-    "invimaRequired": false,
-    "exampleHSCodes": ["8479.89.90.00"]
-  },
-  {
-    "id": "hardware",
-    "label": "Herramientas y ferretería",
+    "id": "packaging-printing",
+    "label": "Embalaje e Impresión",
     "arancelRate": 0.10,
     "ivaRate": 0.19,
     "antidumpingRisk": false,
     "invimaRequired": false,
-    "exampleHSCodes": ["8203.20.00.00"]
+    "exampleHSCodes": ["4819.10.00.00", "4911.10.00.00"]
   },
   {
-    "id": "plastics",
-    "label": "Plásticos y manufacturas",
+    "id": "vehicle-parts",
+    "label": "Piezas y accesorios para vehículos",
     "arancelRate": 0.10,
     "ivaRate": 0.19,
     "antidumpingRisk": false,
     "invimaRequired": false,
-    "exampleHSCodes": ["3924.10.00.00"]
+    "exampleHSCodes": ["8708.99.00.00"]
   },
   {
-    "id": "cosmetics",
-    "label": "Cosméticos y cuidado personal",
+    "id": "home-garden",
+    "label": "Hogar y Jardín",
+    "arancelRate": 0.15,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["8201.90.00.00"]
+  },
+  {
+    "id": "sportswear-outdoor",
+    "label": "Ropa deportiva y para el aire libre",
+    "arancelRate": 0.40,
+    "ivaRate": 0.19,
+    "antidumpingRisk": true,
+    "invimaRequired": false,
+    "exampleHSCodes": ["6112.31.00.00"]
+  },
+  {
+    "id": "beauty",
+    "label": "Belleza",
     "arancelRate": 0.15,
     "ivaRate": 0.19,
     "antidumpingRisk": false,
@@ -90,71 +72,80 @@
     "exampleHSCodes": ["3304.99.00.00"]
   },
   {
-    "id": "supplements",
-    "label": "Suplementos alimenticios",
+    "id": "jewelry-eyewear-watches",
+    "label": "Joyas, lentes y relojes",
+    "arancelRate": 0.10,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": true,
+    "exampleHSCodes": ["7113.19.00.00", "9101.11.00.00", "9004.10.00.00"]
+  },
+  {
+    "id": "footwear-accessories",
+    "label": "Zapatos y Accesorios",
+    "arancelRate": 0.35,
+    "ivaRate": 0.19,
+    "antidumpingRisk": true,
+    "invimaRequired": false,
+    "exampleHSCodes": ["6403.99.00.00"]
+  },
+  {
+    "id": "luggage-bags-cases",
+    "label": "Maletas, Bolsas y Fundas",
+    "arancelRate": 0.15,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["4202.22.00.00", "4202.12.00.00"]
+  },
+  {
+    "id": "parenting-kids-toys",
+    "label": "Padres, niños y juguetes",
+    "arancelRate": 0.15,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["9503.00.22.00"]
+  },
+  {
+    "id": "personal-home-care",
+    "label": "Cuidado personal y Cuidado del hogar",
     "arancelRate": 0.15,
     "ivaRate": 0.19,
     "antidumpingRisk": false,
     "invimaRequired": true,
-    "exampleHSCodes": ["2106.90.79.00"]
+    "exampleHSCodes": ["3401.11.00.00"]
   },
   {
-    "id": "food",
-    "label": "Alimentos procesados",
-    "arancelRate": 0.20,
-    "ivaRate": 0.19,
-    "antidumpingRisk": false,
-    "invimaRequired": true,
-    "exampleHSCodes": ["1902.30.00.00", "2103.90.00.00"]
-  },
-  {
-    "id": "steel",
-    "label": "Acero y productos metálicos",
-    "arancelRate": 0.10,
-    "ivaRate": 0.19,
-    "antidumpingRisk": true,
-    "invimaRequired": false,
-    "exampleHSCodes": ["7214.20.00.00", "7308.90.00.00"]
-  },
-  {
-    "id": "sporting",
-    "label": "Artículos deportivos",
-    "arancelRate": 0.10,
-    "ivaRate": 0.19,
-    "antidumpingRisk": false,
-    "invimaRequired": false,
-    "exampleHSCodes": ["9506.62.00.00"]
-  },
-  {
-    "id": "packaging",
-    "label": "Materiales de embalaje",
-    "arancelRate": 0.10,
-    "ivaRate": 0.19,
-    "antidumpingRisk": false,
-    "invimaRequired": false,
-    "exampleHSCodes": ["4819.10.00.00"]
-  },
-  {
-    "id": "lighting",
-    "label": "Iluminación y electricidad",
+    "id": "health-medicine",
+    "label": "Salud y Medicina",
     "arancelRate": 0.05,
     "ivaRate": 0.19,
     "antidumpingRisk": false,
-    "invimaRequired": false,
-    "exampleHSCodes": ["9405.40.00.00"]
+    "invimaRequired": true,
+    "exampleHSCodes": ["3004.90.00.00"]
   },
   {
-    "id": "bags",
-    "label": "Bolsos y marroquinería",
-    "arancelRate": 0.20,
+    "id": "gifts-crafts",
+    "label": "Regalos y Artesanías",
+    "arancelRate": 0.15,
     "ivaRate": 0.19,
     "antidumpingRisk": false,
     "invimaRequired": false,
-    "exampleHSCodes": ["4202.22.00.00", "4202.92.00.00"]
+    "exampleHSCodes": []
   },
   {
-    "id": "stationery",
-    "label": "Papelería y artículos de oficina",
+    "id": "pet-care",
+    "label": "Cuidado de Mascotas",
+    "arancelRate": 0.10,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["2309.10.00.00"]
+  },
+  {
+    "id": "school-office",
+    "label": "Escuela y Oficina",
     "arancelRate": 0.10,
     "ivaRate": 0.19,
     "antidumpingRisk": false,
@@ -162,13 +153,175 @@
     "exampleHSCodes": ["4820.10.00.00"]
   },
   {
-    "id": "chemicals",
-    "label": "Químicos e insumos industriales",
-    "arancelRate": 0.05,
-    "ivaRate": 0.05,
+    "id": "industrial-machinery",
+    "label": "Maquinaria Industrial",
+    "arancelRate": 0.00,
+    "ivaRate": 0.19,
     "antidumpingRisk": false,
     "invimaRequired": false,
-    "exampleHSCodes": ["3808.91.00.00", "2814.10.00.00"]
+    "exampleHSCodes": ["8479.89.90.00"]
+  },
+  {
+    "id": "commercial-equipment",
+    "label": "Equipamiento Comercial y Maquinaria",
+    "arancelRate": 0.10,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": []
+  },
+  {
+    "id": "construction-machinery",
+    "label": "Maquinaria de construcción",
+    "arancelRate": 0.00,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["8429.51.00.00"]
+  },
+  {
+    "id": "construction-realestate",
+    "label": "Construcción y Bienes Raíces",
+    "arancelRate": 0.15,
+    "ivaRate": 0.19,
+    "antidumpingRisk": true,
+    "invimaRequired": false,
+    "exampleHSCodes": ["7308.90.00.00", "6810.99.00.00"]
+  },
+  {
+    "id": "furniture",
+    "label": "Muebles",
+    "arancelRate": 0.15,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["9403.60.00.00"]
+  },
+  {
+    "id": "lighting",
+    "label": "Luces e Iluminación",
+    "arancelRate": 0.15,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["9405.40.00.00"]
+  },
+  {
+    "id": "home-appliances",
+    "label": "Electrodomésticos",
+    "arancelRate": 0.15,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["8418.10.00.00", "8450.11.00.00"]
+  },
+  {
+    "id": "auto-supplies-tools",
+    "label": "Suministros y herramientas para auto",
+    "arancelRate": 0.10,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["8708.99.00.00"]
+  },
+  {
+    "id": "tools",
+    "label": "Herramientas",
+    "arancelRate": 0.10,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["8203.20.00.00"]
+  },
+  {
+    "id": "renewable-energy",
+    "label": "Energía Renovable",
+    "arancelRate": 0.00,
+    "ivaRate": 0.00,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["8541.43.00.00"]
+  },
+  {
+    "id": "electrical-equipment",
+    "label": "Equipos y suministros eléctricos",
+    "arancelRate": 0.10,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["8536.50.00.00"]
+  },
+  {
+    "id": "security-surveillance",
+    "label": "Seguridad y Vigilancia",
+    "arancelRate": 0.05,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["8525.80.00.00"]
+  },
+  {
+    "id": "material-handling",
+    "label": "Manejo de Materiales",
+    "arancelRate": 0.05,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["8427.20.00.00"]
+  },
+  {
+    "id": "test-instruments",
+    "label": "Instrumentos y equipos de prueba",
+    "arancelRate": 0.05,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["9030.33.00.00"]
+  },
+  {
+    "id": "power-transmission",
+    "label": "Transmisión de Energía",
+    "arancelRate": 0.05,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["8544.49.00.00"]
+  },
+  {
+    "id": "electronic-components",
+    "label": "Partes electrónicas",
+    "arancelRate": 0.05,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["8542.31.00.00", "8534.00.00.00"]
+  },
+  {
+    "id": "vehicles-transport",
+    "label": "Vehículos y Transporte",
+    "arancelRate": 0.35,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": ["8703.23.00.00", "8711.20.00.00"]
+  },
+  {
+    "id": "agriculture-food-beverage",
+    "label": "Agricultura, Alimentos y Bebidas",
+    "arancelRate": 0.15,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": true,
+    "exampleHSCodes": ["2106.90.79.00", "2202.99.00.00"]
+  },
+  {
+    "id": "raw-materials",
+    "label": "Materias primas",
+    "arancelRate": 0.05,
+    "ivaRate": 0.19,
+    "antidumpingRisk": false,
+    "invimaRequired": false,
+    "exampleHSCodes": []
   },
   {
     "id": "other",
